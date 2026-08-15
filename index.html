@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+      /* Critical anti-FOUC: ทำงานทันทีโดยไม่รอ Tailwind CDN */
+      [data-cloak] { display: none !important; }
+      body {
+        font-family: 'Kanit', sans-serif;
+      }
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield; /* Firefox */
+      }
+      /* Pulsing dot animation */
+    @keyframes pulse-dot {
+      0% {
+        transform: scale(0.5);
+        opacity: 0.7;
+      }
+      50% {
+        transform: scale(1.2);
+        opacity: 0.3;
+      }
+      100% {
+        transform: scale(0.5);
+        opacity: 0.7;
+      }
+    }
+    .pulsing-dot {
+      width: 24px;
+      height: 24px;
+      background-color: #4CAF50; /* Green dot */
+      border-radius: 50%;
+      animation: pulse-dot 1.5s infinite ease-in-out;
+    }
+    .auth-grid {
+      background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+    .auth-field:focus-within { border-color:#94a3b8; box-shadow:0 4px 14px rgba(15,23,42,.06); }
+    .auth-field input:-webkit-autofill {
+      -webkit-box-shadow: 0 0 0 40px white inset !important;
+    }
+    button { position:relative; transition:transform .22s cubic-bezier(.2,.8,.2,1), background-color .22s ease, color .22s ease, border-color .22s ease, box-shadow .22s ease, opacity .22s ease; }
+    button:not(:disabled):hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(15,23,42,.10); }
+    button:not(:disabled):active { transform: scale(.975); }
+    button:focus-visible { outline:3px solid rgba(16,185,129,.22); outline-offset:2px; }
+    input:not([type="checkbox"]):not([type="radio"]), select, textarea { transition:border-color .22s ease,box-shadow .22s ease,background-color .22s ease,transform .22s cubic-bezier(.2,.8,.2,1); }
+    input:not([type="checkbox"]):not([type="radio"]):hover, select:hover, textarea:hover { border-color:#94a3b8; background-color:#fff; box-shadow:0 7px 18px rgba(15,23,42,.06); }
+    input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus { outline:none; border-color:#10b981!important; box-shadow:0 0 0 4px rgba(16,185,129,.10),0 8px 20px rgba(15,23,42,.05); }
+    .auth-field input:focus { border-color:transparent!important; box-shadow:none!important; }
+    [data-refresh], #refreshWeightHistory, [id^="export"] { width:42px; height:42px; padding:0!important; display:inline-flex; align-items:center; justify-content:center; flex:0 0 42px; border-radius:9999px!important; background:#fff; color:#475569; box-shadow:0 4px 12px rgba(15,23,42,.06); font-size:0!important; }
+    [data-refresh]::before, #refreshWeightHistory::before { content:'↻'; font-size:20px; line-height:1; }
+    [id^="export"]::before { content:'⇩'; font-size:20px; line-height:1; font-weight:700; }
+    [data-refresh]:hover, #refreshWeightHistory:hover, [id^="export"]:hover { color:#059669; border-color:#a7f3d0; background:#ecfdf5; box-shadow:0 10px 22px rgba(5,150,105,.15); }
+    #machinesDbPanel > div:first-child { margin-bottom:14px; }
+    #machinesDbPanel .rounded-2xl.border.bg-white { border-color:#e2e8f0; background:linear-gradient(145deg,#fff 0%,#f8fafc 100%); box-shadow:0 12px 32px rgba(15,23,42,.06); }
+    #machinesDbPanel .xl\:grid-cols-2 > div { position:relative; overflow:hidden; padding-top:24px; }
+    #machinesDbPanel .xl\:grid-cols-2 > div::before { content:''; position:absolute; inset:0 0 auto 0; height:4px; background:linear-gradient(90deg,#10b981,#34d399); }
+    #machinesDbPanel .xl\:grid-cols-2 > div:nth-child(2)::before { background:linear-gradient(90deg,#0ea5e9,#38bdf8); }
+    #machineNumbersTable table, #machineSizesTable table { border-collapse:separate; border-spacing:0; overflow:hidden; border-radius:14px; }
+    #machineNumbersTable thead th, #machineSizesTable thead th { background:#f1f5f9; color:#64748b; text-transform:uppercase; letter-spacing:.08em; font-size:11px; }
+    #machineNumbersTable tbody tr, #machineSizesTable tbody tr { transition:background-color .18s ease, transform .18s ease; }
+    #machineNumbersTable tbody tr:hover, #machineSizesTable tbody tr:hover { background:#ecfdf5; }
+    #weightRecordPanel { align-items:stretch; }
+    #page-weights > .rounded-2xl:first-child { border-color:#dbe4ee; box-shadow:0 10px 28px rgba(15,23,42,.06); }
+    #weightForm { border-color:#e2e8f0; background:linear-gradient(145deg,#fff,#f8fafc); box-shadow:0 18px 44px rgba(15,23,42,.07); }
+    #weightForm input, #weightForm select, #weightForm textarea { transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease; background:#fff; }
+    #weightForm input:focus, #weightForm select:focus, #weightForm textarea:focus { outline:none; border-color:#10b981; box-shadow:0 0 0 4px rgba(16,185,129,.10); }
+    #weightHistoryTable tbody tr { transition:background-color .18s ease; }
+    #weightHistoryTable tbody tr:hover { background:#f8fafc; }
+    .result-badge { display:inline-flex; min-width:64px; align-items:center; justify-content:center; gap:6px; border-radius:9999px; padding:6px 11px; font-size:12px; font-weight:600; border:1px solid; }
+    .result-ok { color:#047857; background:#ecfdf5; border-color:#a7f3d0; box-shadow:0 4px 12px rgba(16,185,129,.10); }
+    .result-ng { color:#be123c; background:#fff1f2; border-color:#fecdd3; box-shadow:0 4px 12px rgba(244,63,94,.09); }
+    .chart-card { position:relative; overflow:hidden; border:1px solid #e2e8f0; border-radius:24px; background:linear-gradient(145deg,#fff 0%,#f8fafc 100%); padding:22px; box-shadow:0 14px 34px rgba(15,23,42,.06); transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s ease,border-color .25s ease; }
+    .chart-card:hover { transform:translateY(-3px); border-color:#cbd5e1; box-shadow:0 22px 48px rgba(15,23,42,.10); }
+    .chart-card::before { content:''; position:absolute; inset:0 0 auto 0; height:3px; background:linear-gradient(90deg,#10b981,#22c55e,#38bdf8); opacity:.9; }
+    .chart-wrap { position:relative; height:330px; }
+    .chart-filter { border-radius:9999px!important; border-color:#e2e8f0; background:#fff; padding:8px 34px 8px 14px; font-size:12px; font-weight:600; color:#475569; cursor:pointer; }
+    #topPartsTable tbody tr { transition:background-color .18s ease,transform .18s ease; }
+    #topPartsTable tbody tr:hover { background:#ecfdf5; }
+    .app-page:not(.hidden) { animation: page-enter .28s cubic-bezier(.2,.8,.2,1); }
+    .modal-enter { animation: overlay-in .2s ease both; }
+    .modal-enter > div { animation: modal-in .26s cubic-bezier(.2,.8,.2,1) both; }
+    .modal-leave { animation: overlay-out .18s ease both; }
+    .modal-leave > div { animation: modal-out .18s ease both; }
+    @keyframes page-enter { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:none } }
+    @keyframes overlay-in { from { opacity:0 } to { opacity:1 } }
+    @keyframes overlay-out { from { opacity:1 } to { opacity:0 } }
+    @keyframes modal-in { from { opacity:0; transform:translateY(18px) scale(.98) } to { opacity:1; transform:none } }
+    @keyframes modal-out { from { opacity:1; transform:none } to { opacity:0; transform:translateY(10px) scale(.985) } }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+    @media (min-width:1024px) {
+      #appContainer { transition: grid-template-columns .3s cubic-bezier(.2,.8,.2,1); }
+      #sidebar { transition: width .3s cubic-bezier(.2,.8,.2,1), transform .3s ease; }
+      #appContainer.sidebar-collapsed { grid-template-columns: 80px minmax(0,1fr); }
+      #appContainer.sidebar-collapsed #sidebar { width:80px; }
+      #appContainer.sidebar-collapsed .sidebar-label,
+      #appContainer.sidebar-collapsed .sidebar-brand-text,
+      #appContainer.sidebar-collapsed .sidebar-section-label,
+      #appContainer.sidebar-collapsed .sidebar-user-info,
+      #appContainer.sidebar-collapsed .logout-label { display:none; }
+      #appContainer.sidebar-collapsed .sidebar-brand { justify-content:center; padding-left:12px; padding-right:12px; }
+      #appContainer.sidebar-collapsed .sidebar-brand > div:first-child { display:none; }
+      #appContainer.sidebar-collapsed .nav-item { display:flex; justify-content:center; padding-left:0; padding-right:0; font-size:18px; }
+      #appContainer.sidebar-collapsed .sidebar-profile { justify-content:center; padding-left:0; padding-right:0; }
+      #appContainer.sidebar-collapsed #logoutButton { display:flex; justify-content:center; font-size:18px; }
+      #appContainer.sidebar-collapsed .sidebar-collapsed-icon { display:inline; }
+      #appContainer.sidebar-collapsed #sidebarCollapseButton svg { transform:rotate(180deg); }
+    }
+    </style>
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><rect width=%2216%22 height=%2216%22 fill=%22%23065f46%22/><text x=%2250%%22 y=%2250%%22 font-family=%22Arial, sans-serif%22 font-size=%2212%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 fill=%22%23ffffff%22>P</text></svg>" type="image/svg+xml">
+  </head>
+  <body class="bg-slate-100 min-h-screen">
+
+    <div id="authScreen" class="fixed inset-0 z-[100] bg-slate-950 overflow-y-auto">
+      <div class="min-h-full lg:grid lg:grid-cols-[1.08fr_.92fr]">
+        <section class="auth-grid relative hidden lg:flex overflow-hidden bg-emerald-950 px-14 py-12 text-white flex-col justify-between">
+          <div class="absolute -left-28 top-1/3 h-96 w-96 rounded-full bg-emerald-400/10 blur-3xl"></div>
+          <div class="absolute -right-16 -top-16 h-80 w-80 rounded-full border-[64px] border-emerald-400/5"></div>
+          <div class="relative flex items-center gap-3">
+            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-400 text-emerald-950 shadow-lg shadow-emerald-950/30">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"/><path d="M2 20h20M8 8h2m4 0h2m-8 4h2m4 0h2m-8 4h8"/></svg>
+            </div>
+            <div><p class="text-lg font-semibold tracking-wide">PURITY PLASTIC</p><p class="text-xs text-emerald-200/70 tracking-[.2em]">MANUFACTURING SYSTEM</p></div>
+          </div>
+
+          <div class="relative max-w-2xl">
+            <div class="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-100">
+              <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,.12)]"></span>
+              Production Quality Control
+            </div>
+            <h2 class="text-5xl font-semibold leading-[1.15] tracking-tight">เปลี่ยนข้อมูลของเสีย<br><span class="text-emerald-300">ให้เป็นคุณภาพที่วัดผลได้</span></h2>
+            <p class="mt-6 max-w-xl text-lg font-light leading-8 text-emerald-100/65">ระบบบันทึกและติดตามของเสียสำหรับกระบวนการฉีดพลาสติก ออกแบบเพื่อความถูกต้อง รวดเร็ว และตรวจสอบย้อนหลังได้</p>
+            <div class="mt-10 grid max-w-xl grid-cols-3 gap-3">
+              <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4 backdrop-blur"><svg class="mb-3 h-5 w-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="m5 13 4 4L19 7"/></svg><p class="text-sm text-white/80">บันทึกแม่นยำ</p></div>
+              <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4 backdrop-blur"><svg class="mb-3 h-5 w-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3v18m9-9H3"/></svg><p class="text-sm text-white/80">ข้อมูลรวมศูนย์</p></div>
+              <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4 backdrop-blur"><svg class="mb-3 h-5 w-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></svg><p class="text-sm text-white/80">พร้อมวิเคราะห์</p></div>
+            </div>
+          </div>
+          <p class="relative text-xs tracking-wide text-emerald-100/40">© 2026 Purity Plastic · Internal use only</p>
+        </section>
+
+        <main class="relative flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10 sm:px-10">
+          <div class="absolute inset-x-0 top-0 h-1 bg-emerald-500 lg:hidden"></div>
+          <div class="w-full max-w-md">
+            <div class="mb-10 flex items-center gap-3 lg:hidden">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white"><span class="text-lg font-bold">P</span></div>
+              <div><p class="font-semibold text-slate-900">PURITY PLASTIC</p><p class="text-[10px] tracking-[.18em] text-slate-400">MANUFACTURING SYSTEM</p></div>
+            </div>
+            <div class="mb-8">
+              <p class="mb-3 text-sm font-medium text-emerald-600">PURITY PLASTICS CO, LTD</p>
+              <h1 class="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Welcome</h1>
+              <p id="authSubtitle" class="mt-3 text-base font-light text-slate-500">เข้าสู่ระบบเพื่อเริ่มต้นการใช้งาน</p>
+            </div>
+
+            <form id="loginForm" class="space-y-5">
+              <div><label for="loginUsername" class="mb-2 block text-sm font-medium text-slate-700">ชื่อผู้ใช้</label><div class="auth-field flex items-center rounded-xl border border-slate-200 bg-white transition"><svg class="ml-4 h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="1.8" d="M20 21a8 8 0 0 0-16 0m12-13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg><input id="loginUsername" autocomplete="username" placeholder="กรอกชื่อผู้ใช้" required class="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-300"></div></div>
+              <div><div class="mb-2 flex items-center justify-between"><label for="loginPassword" class="block text-sm font-medium text-slate-700">รหัสผ่าน</label><span class="text-xs text-slate-400">Security V3.0</span></div><div class="auth-field flex items-center rounded-xl border border-slate-200 bg-white transition"><svg class="ml-4 h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="1.8" d="M7 10V8a5 5 0 0 1 10 0v2m-11 0h12a1 1 0 0 1 1 1v9H5v-9a1 1 0 0 1 1-1Z"/></svg><input type="password" id="loginPassword" autocomplete="current-password" placeholder="กรอกรหัสผ่าน" required class="w-full bg-transparent px-3 py-3.5 text-slate-900 outline-none placeholder:text-slate-300"><button type="button" data-toggle-password="loginPassword" title="แสดงรหัสผ่าน" class="mr-3 rounded-lg p-2 text-slate-400 hover:bg-slate-100">◉</button></div></div>
+              <button id="loginButton" class="group flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3.5 font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 hover:shadow-emerald-600/30 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 disabled:cursor-wait disabled:opacity-70">เข้าสู่ระบบ<svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="m9 18 6-6-6-6"/></svg></button>
+            </form>
+
+            <form id="changePasswordForm" class="space-y-5 hidden">
+              <div class="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 9v4m0 4h.01M10.3 4.2 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z"/></svg><span>เพื่อความปลอดภัย กรุณาตั้งรหัสผ่านส่วนตัวก่อนเริ่มใช้งาน</span></div>
+              <div><label for="newPassword" class="mb-2 block text-sm font-medium text-slate-700">รหัสผ่านใหม่</label><div class="auth-field flex rounded-xl border border-slate-200 bg-white transition"><input type="password" id="newPassword" minlength="10" autocomplete="new-password" placeholder="อย่างน้อย 10 ตัวอักษร" required class="w-full bg-transparent px-4 py-3.5 outline-none"><button type="button" data-toggle-password="newPassword" class="mr-3 text-slate-400">◉</button></div></div>
+              <div><label for="confirmPassword" class="mb-2 block text-sm font-medium text-slate-700">ยืนยันรหัสผ่านใหม่</label><div class="auth-field flex rounded-xl border border-slate-200 bg-white transition"><input type="password" id="confirmPassword" minlength="10" autocomplete="new-password" placeholder="กรอกรหัสผ่านอีกครั้ง" required class="w-full bg-transparent px-4 py-3.5 outline-none"><button type="button" data-toggle-password="confirmPassword" class="mr-3 text-slate-400">◉</button></div></div>
+              <button id="changePasswordButton" class="w-full rounded-xl bg-emerald-600 px-5 py-3.5 font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:opacity-70">ตั้งรหัสผ่านและเข้าสู่ระบบ</button>
+            </form>
+
+            <div id="authError" role="alert" aria-live="polite" class="mt-5 min-h-12 rounded-xl border border-transparent px-4 py-3 text-center text-sm text-red-600 empty:p-0"></div>
+            <div class="mt-8 flex items-center justify-center gap-2 text-xs text-slate-400"><svg class="h-4 w-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path stroke-width="2" d="m9 12 2 2 4-4"/></svg>ระบบภายในสำหรับพนักงานที่ได้รับอนุญาตเท่านั้น</div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notification" class="pointer-events-none fixed left-1/2 top-5 z-[120] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 translate-y-[-12px] transform opacity-0 transition-all duration-300">
+      <div class="flex items-center space-x-3 rounded-2xl border bg-white px-5 py-4 font-medium shadow-2xl shadow-slate-900/15">
+        <svg id="success-icon" class="w-6 h-6 text-green-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <svg id="error-icon" class="w-6 h-6 text-red-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span id="notification-message"></span>
+      </div>
+    </div>
+
+    <!-- Loading Popup for Search/Save -->
+  <div id="loadingPopup" class="fixed inset-0 bg-gray-800/75 flex items-center justify-center z-50 hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center space-y-4">
+      <div class="pulsing-dot"></div>
+      <p id="loadingMessage" class="text-gray-800 text-lg font-semibold">กำลังดำเนินการ...</p>
+    </div>
+  </div>
+  <!-- End Loading Popup -->
+
+    <div id="appContainer" data-cloak class="hidden min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
+      <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex h-dvh w-[260px] -translate-x-full flex-col bg-slate-950 text-white transition-transform duration-300 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:translate-x-0">
+        <div class="sidebar-brand flex h-20 shrink-0 items-center gap-3 border-b border-white/10 px-5">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 font-bold text-slate-950">P</div>
+          <div class="sidebar-brand-text min-w-0 flex-1"><p class="whitespace-nowrap font-semibold tracking-wide">PURITY PLASTIC</p><p class="whitespace-nowrap text-[10px] tracking-[.16em] text-slate-400">QUALITY SYSTEM</p></div>
+          <button id="sidebarCollapseButton" type="button" title="ย่อ Sidebar" class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white lg:flex"><svg class="h-4 w-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 18-6-6 6-6"/></svg></button>
+        </div>
+        <nav id="sidebarNav" class="flex-1 space-y-1 overflow-y-auto p-4">
+          <button title="หน้าหลัก" data-page="home" data-permission="home" class="nav-item w-full rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/10 hover:text-white">⌂ <span class="sidebar-label ml-3">หน้าหลัก</span></button>
+          <button title="Dashboard" data-page="dashboard" data-permission="dashboard" class="nav-item w-full rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/10 hover:text-white">▦ <span class="sidebar-label ml-3">Dashboard</span></button>
+          <button title="ลงข้อมูลของเสีย" data-page="defects" data-permission="defects" class="nav-item w-full rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/10 hover:text-white">＋ <span class="sidebar-label ml-3">ลงข้อมูลของเสีย</span></button>
+          <button title="บันทึกน้ำหนักชิ้นงาน" data-page="weights" data-permission="weights" class="nav-item w-full rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/10 hover:text-white">＋ <span class="sidebar-label ml-3">บันทึกน้ำหนักชิ้นงาน</span></button>
+          <div class="sidebar-section-label px-4 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">ตั้งค่า</div>
+          <button title="ตั้งค่าฐานข้อมูล" data-page="parts" data-permission="parts" class="nav-item w-full rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/10 hover:text-white">◫ <span class="sidebar-label ml-3">ตั้งค่าฐานข้อมูล</span></button>
+          <button title="ตั้งค่าผู้ใช้งาน" data-page="users" data-permission="users" class="nav-item w-full rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/10 hover:text-white">♙ <span class="sidebar-label ml-3">ตั้งค่าผู้ใช้งาน</span></button>
+          <button title="Audit Log" data-page="logs" data-permission="logs" class="nav-item w-full rounded-xl px-4 py-3 text-left text-sm text-slate-300 hover:bg-white/10 hover:text-white">≡ <span class="sidebar-label ml-3">Log</span></button>
+        </nav>
+        <div class="shrink-0 border-t border-white/10 bg-slate-950 p-4"><div class="sidebar-profile mb-3 flex items-center gap-3 px-2"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-sm text-emerald-300">U</div><div class="sidebar-user-info min-w-0"><p id="currentUser" class="truncate text-sm font-medium"></p><p id="currentRole" class="text-xs text-slate-500"></p></div></div><button id="logoutButton" title="ออกจากระบบ" class="w-full rounded-xl border border-white/10 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10"><span aria-hidden="true" class="hidden sidebar-collapsed-icon">↪</span><span class="logout-label">ออกจากระบบ</span></button></div>
+      </aside>
+
+      <main class="min-w-0">
+        <header class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur md:px-8"><button id="menuButton" class="rounded-lg p-2 text-xl lg:hidden">☰</button><div><h1 id="pageTitle" class="font-semibold text-slate-800">Dashboard</h1><p id="pageSubtitle" class="hidden text-xs text-slate-400 sm:block">Purity Plastic Quality System</p></div><div class="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_5px_rgba(16,185,129,.12)]"></div></header>
+        <div class="p-4 md:p-8">
+          <section id="page-home" class="app-page hidden space-y-6"><div class="relative overflow-hidden rounded-3xl bg-slate-950 p-8 text-white shadow-xl md:p-12"><div class="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-emerald-500/15 blur-2xl"></div><div class="relative"><p class="text-sm font-medium tracking-[.18em] text-emerald-300">PURITY QUALITY CONTROL</p><h2 class="mt-4 max-w-3xl text-3xl font-semibold leading-tight md:text-5xl">ระบบบริหารข้อมูลของเสีย<br><span class="text-emerald-300">สำหรับงานฉีดพลาสติกทั่วไป</span></h2><p class="mt-5 max-w-2xl text-slate-400">บันทึก วิเคราะห์ และจัดการข้อมูลการผลิตจากศูนย์กลางเดียว พร้อมระบบสิทธิ์และประวัติการทำรายการ</p></div></div><div class="grid gap-4 md:grid-cols-3"><button data-go="dashboard" class="rounded-2xl border bg-white p-6 text-left shadow-sm hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"><p class="text-sm text-slate-400">Dashboard</p><p class="mt-2 text-lg font-semibold text-slate-800">ภาพรวมข้อมูล →</p></button><button data-go="defects" class="rounded-2xl border bg-white p-6 text-left shadow-sm hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"><p class="text-sm text-slate-400">Defect Record</p><p class="mt-2 text-lg font-semibold text-slate-800">บันทึกข้อมูลของเสีย →</p></button><button data-go="parts" class="rounded-2xl border bg-white p-6 text-left shadow-sm hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"><p class="text-sm text-slate-400">DB Setting</p><p class="mt-2 text-lg font-semibold text-slate-800">ตั้งค่าฐานข้อมูล →</p></button></div></section>
+          <section id="page-dashboard" class="app-page space-y-6"><div id="dashboardStats" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"></div><div class="rounded-2xl border bg-white p-2 shadow-sm"><div class="flex gap-1"><button data-dashboard-tab="raw" class="dashboard-tab flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white">ข้อมูลของเสียรายวัน</button><button data-dashboard-tab="pivot" class="dashboard-tab flex-1 rounded-xl px-4 py-3 text-sm font-medium text-slate-500 hover:bg-slate-50">ข้อมูลของเสียรายวัตถุดิบ</button></div></div><div id="dashboardRawPanel" class="rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><h2 class="text-lg font-semibold">ข้อมูลของเสียรายวัน</h2><p class="text-sm text-slate-400">Admin สามารถแก้ไขข้อมูลแต่ละรายการได้</p></div><div class="flex flex-wrap gap-2"><input id="rawSearch" placeholder="ค้นหาทุกคอลัมน์..." class="min-w-[220px] rounded-xl border px-4 py-2.5 text-sm"><input id="rawDateFilter" type="date" class="rounded-xl border px-3 py-2.5 text-sm"><button data-refresh="dashboard" title="รีเฟรช" class="icon-refresh rounded-xl border p-2.5 text-slate-500 hover:bg-slate-50">↻</button></div></div><div id="rawDataTable" class="overflow-auto"></div></div><div id="dashboardPivotPanel" class="hidden rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="text-lg font-semibold">ข้อมูลของเสียรายวัตถุดิบ</h2><p class="text-sm text-slate-400">ข้อมูลสรุปจาก Google Sheets</p></div><div class="flex gap-2"><input id="pivotSearch" placeholder="ค้นหาใน Pivot..." class="rounded-xl border px-4 py-2.5 text-sm"><button data-refresh="dashboard" title="รีเฟรช" class="icon-refresh rounded-xl border p-2.5 text-slate-500 hover:bg-slate-50">↻</button></div></div><div id="pivotTable" class="overflow-auto"></div></div></section>
+
+          <section id="page-defects" class="app-page hidden">
+      <div class="mb-8"><h1 class="text-2xl md:text-3xl font-bold text-gray-800">บันทึกของเสียงานฉีดพลาสติก</h1><p class="mt-1 text-sm text-gray-500">Plastic Injection · Production Entry</p></div>
+      <form id="defectForm" class="space-y-6">
+
+        <!-- Main Grid for 4 Sections -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <!-- Top Left: รายละเอียดชิ้นงาน -->
+          <div class="bg-slate-100 p-6 rounded-2xl">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b-2 border-green-300 pb-2">รายละเอียดชิ้นงาน</h2>
+            <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4 mb-4">
+              <div class="flex-grow">
+                <label for="partCode" class="block text-sm font-medium text-gray-700 mb-1">รหัสชิ้นงาน (ID Code)</label>
+                <input type="text" id="partCode" name="partCode" list="partCodeOptions" autocomplete="off" placeholder="พิมพ์เพื่อค้นหารหัสชิ้นงาน" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200"><datalist id="partCodeOptions"></datalist>
+              </div>
+              <button type="button" id="searchButton" class="mt-4 sm:mt-0 px-6 py-2 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 transition-all duration-200">
+                ค้นหา
+              </button>
+            </div>
+            <div class="grid grid-cols-1 gap-4 mt-5">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">หมายเลขชิ้นงาน (Part Code)</label>
+                <input type="text" id="partNo" name="partNo" readonly class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg border border-gray-300">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อชิ้นงาน (Part Name)</label>
+                <input type="text" id="partName" name="partName" readonly class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg border border-gray-300">
+              </div>
+              <!-- น้ำหนักชิ้นงานและน้ำหนักรันเนอร์ในแถวเดียวกัน -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">น้ำหนักชิ้นงาน (Part)</label>
+                  <input type="text" id="partWeight" name="partWeight" readonly class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg border border-gray-300">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">น้ำหนักรันเนอร์ (Runner)</label>
+                  <input type="text" id="runnerWeight" name="runnerWeight" readonly class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg border border-gray-300">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">ชนิดวัสดุ (Material)</label>
+                <input type="text" id="material" name="material" readonly class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg border border-gray-300">
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Right: ข้อมูลการผลิต -->
+          <div class="bg-slate-100 p-6 rounded-2xl">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b-2 border-green-300 pb-2">ข้อมูลการผลิต</h2>
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <label for="date" class="block text-sm font-medium text-gray-700 mb-1">วันที่ผลิต</label>
+                <input type="date" id="date" name="date" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="productionQuantity" class="block text-sm font-medium text-gray-700 mb-1">จำนวนการผลิต (ชิ้นงานดี) | หน่วย: ชิ้น</label>
+                <input type="number" id="productionQuantity" name="productionQuantity" min="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="mcNo" class="block text-sm font-medium text-gray-700 mb-1">หมายเลขเครื่องฉีด (M/C No.) </label>
+                <input type="text" id="mcNo" name="mcNo" list="mcNoOptions" autocomplete="off" placeholder="ค้นหาและเลือกหมายเลขเครื่อง" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200"><datalist id="mcNoOptions"></datalist>
+              </div>
+              <div>
+                <label for="mcSize" class="block text-sm font-medium text-gray-700 mb-1">ขนาดเครื่องฉีด (M/C Size) | Ton </label>
+                <input type="text" id="mcSize" name="mcSize" list="mcSizeOptions" autocomplete="off" placeholder="ค้นหาและเลือกขนาดเครื่อง" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200"><datalist id="mcSizeOptions"></datalist>
+              </div>
+
+              <div>
+                <label for="shift" class="block text-sm font-medium text-gray-700 mb-1">กะ (Shift)</label>
+                <select id="shift" name="shift" required class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-400"><option value="A">Shift A</option><option value="B">Shift B</option><option value="C">Shift C</option></select>
+              </div>
+
+            </div>
+          </div>
+          
+          <!-- ของเสียจากการผลิต (เดิมอยู่ด้านล่าง) -->
+          <div class="bg-slate-100 p-6 rounded-2xl">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b-2 border-green-300 pb-2">ของเสียจากการผลิต (ชิ้น)</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <!-- กลุ่มของเสียตามหัวข้อ -->
+              <div>
+                <label for="blackDot" class="block text-sm font-medium text-gray-700 mb-1">จุดดำ</label>
+                <input type="number" id="blackDot" name="blackDot" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="underfill" class="block text-sm font-medium text-gray-700 mb-1">แหว่ง</label>
+                <input type="number" id="underfill" name="underfill" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="broken" class="block text-sm font-medium text-gray-700 mb-1">แตก</label>
+                <input type="number" id="broken" name="broken" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="bubble" class="block text-sm font-medium text-gray-700 mb-1">ฟองอากาศ</label>
+                <input type="number" id="bubble" name="bubble" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="colorMix" class="block text-sm font-medium text-gray-700 mb-1">สีปน</label>
+                <input type="number" id="colorMix" name="colorMix" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="crack" class="block text-sm font-medium text-gray-700 mb-1">ร้าว</label>
+                <input type="number" id="crack" name="crack" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="oilStain" class="block text-sm font-medium text-gray-700 mb-1">คราบน้ำมัน</label>
+                <input type="number" id="oilStain" name="oilStain" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="scratch" class="block text-sm font-medium text-gray-700 mb-1">รอยขีดข่วน</label>
+                <input type="number" id="scratch" name="scratch" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="trimWaste" class="block text-sm font-medium text-gray-700 mb-1">แต่งเสีย</label>
+                <input type="number" id="trimWaste" name="trimWaste" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="sinkMark" class="block text-sm font-medium text-gray-700 mb-1">ยุบ</label>
+                <input type="number" id="sinkMark" name="sinkMark" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="dropped" class="block text-sm font-medium text-gray-700 mb-1">หล่น</label>
+                <input type="number" id="dropped" name="dropped" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="ejectorPinMark" class="block text-sm font-medium text-gray-700 mb-1">กระทุ้งขาว</label>
+                <input type="number" id="ejectorPinMark" name="ejectorPinMark" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="flash" class="block text-sm font-medium text-gray-700 mb-1">ครีบแลบ</label>
+                <input type="number" id="flash" name="flash" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="warp" class="block text-sm font-medium text-gray-700 mb-1">โก่ง-แอ่น</label>
+                <input type="number" id="warp" name="warp" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="weldLine" class="block text-sm font-medium text-gray-700 mb-1">รอยประสาน</label>
+                <input type="number" id="weldLine" name="weldLine" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="other" class="block text-sm font-medium text-gray-700 mb-1">อื่นๆ</label>
+                <input type="number" id="other" name="other" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+            </div>
+          </div>
+
+          <!-- ของเสียจากการปรับฉีด (เดิมอยู่ด้านล่าง) -->
+          <div class="bg-slate-100 p-6 rounded-2xl">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b-2 border-green-300 pb-2">ของเสียการปรับฉีด (ชิ้น)</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <!-- กลุ่มของเสียตามหัวข้อ -->
+              <div>
+                <label for="adjBlackDot" class="block text-sm font-medium text-gray-700 mb-1">จุดดำ (ไหม้)</label>
+                <input type="number" id="adjBlackDot" name="adjBlackDot" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjUnderfill" class="block text-sm font-medium text-gray-700 mb-1">แหว่ง</label>
+                <input type="number" id="adjUnderfill" name="adjUnderfill" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjBroken" class="block text-sm font-medium text-gray-700 mb-1">แตก</label>
+                <input type="number" id="adjBroken" name="adjBroken" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjBubble" class="block text-sm font-medium text-gray-700 mb-1">ฟองอากาศ</label>
+                <input type="number" id="adjBubble" name="adjBubble" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjColorMix" class="block text-sm font-medium text-gray-700 mb-1">สีปน</label>
+                <input type="number" id="adjColorMix" name="adjColorMix" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjCrack" class="block text-sm font-medium text-gray-700 mb-1">ร้าว</label>
+                <input type="number" id="adjCrack" name="adjCrack" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjSinkMark" class="block text-sm font-medium text-gray-700 mb-1">ยุบ</label>
+                <input type="number" id="adjSinkMark" name="adjSinkMark" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjEjectorPinMark" class="block text-sm font-medium text-gray-700 mb-1">กระทุ้งขาว</label>
+                <input type="number" id="adjEjectorPinMark" name="adjEjectorPinMark" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjFlash" class="block text-sm font-medium text-gray-700 mb-1">ครีบแลบ</label>
+                <input type="number" id="adjFlash" name="adjFlash" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjWarp" class="block text-sm font-medium text-gray-700 mb-1">โก่ง-แอ่น</label>
+                <input type="number" id="adjWarp" name="adjWarp" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjWeldLine" class="block text-sm font-medium text-gray-700 mb-1">รอยประสาน</label>
+                <input type="number" id="adjWeldLine" name="adjWeldLine" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjStain" class="block text-sm font-medium text-gray-700 mb-1">คราบ</label>
+                <input type="number" id="adjStain" name="adjStain" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+              <div>
+                <label for="adjOther" class="block text-sm font-medium text-gray-700 mb-1">อื่นๆ</label>
+                <input type="number" id="adjOther" name="adjOther" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ปุ่มฟอร์ม -->
+        <div class="flex justify-center space-x-4 pt-6">
+          <button type="submit" id="saveButton" class="px-6 py-2 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 transition-all duration-200">
+            บันทึก
+          </button>
+          <button type="button" id="clearButton" class="px-6 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg shadow-md hover:bg-gray-300 transition-all duration-200">
+            ล้างฟอร์ม
+          </button>
+        </div>
+
+      </form></section>
+
+          <section id="page-weights" class="app-page hidden space-y-5"><div class="rounded-2xl border bg-white p-2 shadow-sm"><div class="flex gap-1"><button data-weight-tab="record" class="weight-tab flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white">บันทึกน้ำหนัก</button><button data-weight-tab="history" class="weight-tab flex-1 rounded-xl px-4 py-3 text-sm font-medium text-slate-500">ประวัติการบันทึก</button></div></div><div id="weightRecordPanel" class="grid gap-5 xl:grid-cols-[1fr_.9fr]"><form id="weightForm" class="space-y-4 rounded-2xl border bg-white p-6 shadow-sm"><div><h2 class="text-xl font-semibold">ข้อมูลการชั่งน้ำหนัก</h2><p class="text-sm text-slate-400">ค้นหาชิ้นงานจากฐานข้อมูลกลาง</p></div><label class="block text-sm text-slate-600">ชิ้นงาน<input id="weightPartSearch" list="weightPartOptions" required autocomplete="off" placeholder="ค้นหา ID Code / Part Code / ชื่อชิ้นงาน" class="mt-1 w-full rounded-xl border px-4 py-3"><datalist id="weightPartOptions"></datalist></label><div class="grid gap-4 sm:grid-cols-2"><label class="text-sm text-slate-600">วันที่<input id="weightDate" type="date" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">เวลา<select id="weightTime" required class="mt-1 w-full rounded-xl border bg-white px-4 py-3"><option value="">เลือกเวลา</option></select></label><label class="text-sm text-slate-600">พนักงานผู้ชั่ง<input id="weightOperator" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Tolerance (±)<input id="weightTolerance" type="number" value="5" min="0" step="0.001" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600 sm:col-span-2">น้ำหนักที่ชั่งจริง<input id="weightActual" type="number" step="0.001" required class="mt-1 w-full rounded-xl border px-4 py-3 text-lg font-semibold"></label><label class="text-sm text-slate-600 sm:col-span-2">หมายเหตุ<textarea id="weightRemark" rows="3" class="mt-1 w-full rounded-xl border px-4 py-3"></textarea></label></div><button class="w-full rounded-xl bg-emerald-600 px-5 py-3.5 font-semibold text-white">บันทึกผลการชั่ง</button></form><div class="rounded-2xl bg-slate-950 p-6 text-white shadow-xl"><p class="text-sm text-emerald-300">WEIGHT INSPECTION</p><h2 id="weightPartTitle" class="mt-2 text-xl font-semibold">ยังไม่ได้เลือกชิ้นงาน</h2><p id="weightMaterial" class="mt-1 text-sm text-slate-400">Material: -</p><div class="mt-6 grid grid-cols-3 gap-3"><div class="rounded-2xl bg-white/5 p-4"><p class="text-xs text-slate-400">LSL</p><p id="weightLsl" class="mt-2 text-xl font-semibold">0.00</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-xs text-slate-400">STD</p><p id="weightStd" class="mt-2 text-xl font-semibold text-emerald-300">0.00</p></div><div class="rounded-2xl bg-white/5 p-4"><p class="text-xs text-slate-400">USL</p><p id="weightUsl" class="mt-2 text-xl font-semibold">0.00</p></div></div><div id="weightJudgment" class="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-xl font-semibold text-slate-400">ระบุน้ำหนักที่ชั่ง</div></div></div><div id="weightHistoryPanel" class="hidden rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 class="text-lg font-semibold">ประวัติการบันทึกน้ำหนัก</h2><p class="text-sm text-slate-400">50 รายการล่าสุดจาก dailyRecord</p></div><div class="flex gap-2"><input id="weightHistorySearch" placeholder="ค้นหารายการ..." class="rounded-xl border px-4 py-2.5"><button id="refreshWeightHistory" title="รีเฟรช" class="rounded-xl border px-3 py-2.5">↻</button></div></div><div id="weightHistoryTable" class="max-h-[560px] overflow-auto rounded-xl border"></div></div></section>
+
+          <section id="page-parts" class="app-page hidden space-y-5"><div class="rounded-2xl border bg-white p-2 shadow-sm"><div class="flex gap-1"><button data-db-tab="parts" class="db-tab flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white">ฐานข้อมูลชิ้นงาน</button><button data-db-tab="machines" class="db-tab flex-1 rounded-xl px-4 py-3 text-sm font-medium text-slate-500 hover:bg-slate-50">ฐานข้อมูลเครื่องฉีด</button></div></div><div id="partsDbPanel" class="rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="text-lg font-semibold">ตั้งค่าฐานข้อมูลชิ้นงาน</h2><p class="text-sm text-slate-400">DB: dataBase</p></div><div class="flex flex-wrap gap-2"><input id="partFilter" placeholder="ค้นหารหัสหรือชื่อชิ้นงาน..." class="min-w-[230px] rounded-xl border px-4 py-2.5 text-sm"><button id="exportPartsCsv" class="rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">⇩ CSV</button><button id="addPartButton" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white">＋ เพิ่มชิ้นงาน</button></div></div><div id="partsTable" class="overflow-auto"></div></div><div id="machinesDbPanel" class="hidden space-y-5"><div class="grid gap-5 xl:grid-cols-2"><div class="rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-4 flex items-center justify-between"><div><h2 class="font-semibold">ข้อมูลหมายเลขเครื่องฉีด</h2></div><button data-add-machine="number" class="add-machine-button rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">＋ เพิ่ม</button></div><div id="machineNumbersTable" class="overflow-auto"></div></div><div class="rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-4 flex items-center justify-between"><div><h2 class="font-semibold">ข้อมูลขนาดเครื่องฉีด</h2></div><button data-add-machine="size" class="add-machine-button rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">＋ เพิ่ม</button></div><div id="machineSizesTable" class="overflow-auto"></div></div></div></div></section>
+
+          <section id="page-users" class="app-page hidden"><div class="rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><h2 class="text-lg font-semibold">ตั้งค่าผู้ใช้งาน</h2><p class="text-sm text-slate-400">จัดการบทบาท, สถานะ และสิทธิ์เข้าถึงข้อมูล</p></div><div class="flex flex-wrap gap-2"><input id="userSearch" placeholder="ค้นหาผู้ใช้งาน..." class="rounded-xl border px-4 py-2.5 text-sm"><select id="userRoleFilter" class="rounded-xl border px-3 py-2.5 text-sm"><option value="">ทุก Role</option><option value="admin">Admin</option><option value="user">User</option></select><select id="userStatusFilter" class="rounded-xl border px-3 py-2.5 text-sm"><option value="">ทุกสถานะ</option><option value="active">Active</option><option value="disabled">Disabled</option></select><button id="addUserButton" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white">＋ เพิ่มผู้ใช้งาน</button></div></div><div id="usersTable" class="overflow-auto"></div></div></section>
+
+          <section id="page-logs" class="app-page hidden"><div class="rounded-2xl border bg-white p-5 shadow-sm"><div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><h2 class="text-lg font-semibold">Audit Log</h2><p class="text-sm text-slate-400">ประวัติการทำรายการย้อนหลัง</p></div><div class="flex flex-wrap gap-2"><input id="logSearch" placeholder="ค้นหาผู้ใช้หรือรายละเอียด..." class="rounded-xl border px-4 py-2.5 text-sm"><select id="logActionFilter" class="rounded-xl border px-3 py-2.5 text-sm"><option value="">ทุก Action</option><option>LOGIN</option><option>SAVE_DEFECT</option><option>UPDATE_RAW_DATA</option><option>SAVE_PART</option><option>SAVE_USER</option></select><select id="logStatusFilter" class="rounded-xl border px-3 py-2.5 text-sm"><option value="">ทุกสถานะ</option><option value="SUCCESS">SUCCESS</option><option value="FAILED">FAILED</option></select><button data-refresh="logs" title="รีเฟรช" class="icon-refresh rounded-xl border p-2.5 text-slate-500 hover:bg-slate-50">↻</button></div></div><div id="logsTable" class="overflow-auto"></div></div></section>
+        </div>
+      </main>
+      <div id="sidebarBackdrop" class="fixed inset-0 z-30 hidden bg-slate-950/50 lg:hidden"></div>
+    </div>
+
+    <div id="partModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><div class="w-full max-w-2xl rounded-3xl bg-white shadow-2xl"><div class="flex items-center justify-between border-b px-6 py-5"><div><h2 id="partModalTitle" class="text-xl font-semibold">เพิ่มชิ้นงาน</h2><p class="text-sm text-slate-400">กรอกข้อมูล Master Data ให้ครบถ้วน</p></div><button data-close-modal="partModal" class="rounded-lg p-2 text-xl text-slate-400 hover:bg-slate-100">×</button></div><form id="partForm" class="grid gap-4 p-6 sm:grid-cols-2"><label class="text-sm text-slate-600">ID Code<input name="idCode" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Part Code<input name="partCode" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600 sm:col-span-2">Part Name<input name="partName" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Material<input name="material" class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Price / Pc.<input name="price" type="number" step="any" class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Part weight<input name="partWeight" type="number" step="any" class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Runner weight<input name="runnerWeight" type="number" step="any" class="mt-1 w-full rounded-xl border px-4 py-3"></label><div class="flex justify-end gap-3 border-t pt-5 sm:col-span-2"><button type="button" data-close-modal="partModal" class="rounded-xl border px-5 py-2.5">ยกเลิก</button><button class="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white">บันทึกชิ้นงาน</button></div></form></div></div>
+
+    <div id="machineModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><div class="w-full max-w-md rounded-3xl bg-white shadow-2xl"><div class="flex items-center justify-between border-b px-6 py-5"><div><h2 id="machineModalTitle" class="text-xl font-semibold">เพิ่มข้อมูลเครื่องฉีด</h2><p class="text-sm text-slate-400">ระบบจะจัดรูปแบบก่อนบันทึกลง rawData</p></div><button data-close-modal="machineModal" class="rounded-lg p-2 text-xl text-slate-400 hover:bg-slate-100">×</button></div><form id="machineForm" class="space-y-4 p-6"><input type="hidden" name="category"><input type="hidden" name="oldValue"><label class="block text-sm text-slate-600"><span id="machineValueLabel">ค่า</span><input name="value" required autocomplete="off" class="mt-1 w-full rounded-xl border px-4 py-3"></label><div class="flex justify-end gap-3 border-t pt-5"><button type="button" data-close-modal="machineModal" class="rounded-xl border px-5 py-2.5">ยกเลิก</button><button class="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white">บันทึก</button></div></form></div></div>
+
+    <div id="userModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><div class="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl"><div class="sticky top-0 flex items-center justify-between border-b bg-white px-6 py-5"><div><h2 id="userModalTitle" class="text-xl font-semibold">เพิ่มผู้ใช้งาน</h2><p class="text-sm text-slate-400">กำหนดบัญชี Role และสิทธิ์การเข้าถึง</p></div><button data-close-modal="userModal" class="rounded-lg p-2 text-xl text-slate-400 hover:bg-slate-100">×</button></div><form id="userForm" class="grid gap-4 p-6 sm:grid-cols-2"><label class="text-sm text-slate-600">Username<input name="username" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">ชื่อแสดงผล<input name="displayName" class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600 sm:col-span-2">รหัสผ่านเริ่มต้น / รีเซ็ตรหัสผ่าน<input name="temporaryPassword" type="password" placeholder="เว้นว่างหากไม่ต้องการเปลี่ยน" class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Role<select name="role" class="mt-1 w-full rounded-xl border px-4 py-3"><option value="user">User</option><option value="admin">Admin</option></select></label><label class="text-sm text-slate-600">สถานะ<select name="active" class="mt-1 w-full rounded-xl border px-4 py-3"><option value="true">เปิดใช้งาน</option><option value="false">ปิดใช้งาน</option></select></label><fieldset class="rounded-2xl border p-4 sm:col-span-2"><legend class="px-2 text-sm font-medium">สิทธิ์เข้าถึงหน้า</legend><div id="permissionChecks" class="grid gap-3 text-sm sm:grid-cols-2"><label><input type="checkbox" value="dashboard"> Dashboard</label><label><input type="checkbox" value="defects" checked> ลงข้อมูลของเสีย</label><label><input type="checkbox" value="parts"> ตั้งค่าฐานข้อมูล</label><label><input type="checkbox" value="users"> ตั้งค่าผู้ใช้งาน</label><label><input type="checkbox" value="logs"> Audit Log</label></div></fieldset><div class="flex justify-end gap-3 border-t pt-5 sm:col-span-2"><button type="button" data-close-modal="userModal" class="rounded-xl border px-5 py-2.5">ยกเลิก</button><button class="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white">บันทึกผู้ใช้งาน</button></div></form></div></div>
+
+    <div id="rawModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><div class="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white shadow-2xl"><div class="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-5"><div><h2 class="text-xl font-semibold">แก้ไขข้อมูล rawData</h2><p id="rawModalSubtitle" class="text-sm text-slate-400"></p></div><button data-close-modal="rawModal" class="rounded-lg p-2 text-xl text-slate-400 hover:bg-slate-100">×</button></div><form id="rawEditForm" class="p-6"><input type="hidden" name="rowNumber"><div id="rawEditFields" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div><div class="mt-6 flex justify-end gap-3 border-t pt-5"><button type="button" data-close-modal="rawModal" class="rounded-xl border px-5 py-2.5">ยกเลิก</button><button class="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white">บันทึกการแก้ไข</button></div></form></div></div>
+  <script>
+    // ห่อโค้ด JavaScript ทั้งหมดด้วย DOMContentLoaded event listener
+    document.addEventListener('DOMContentLoaded', (event) => {
+      const form = document.getElementById('defectForm');
+      const partCodeInput = document.getElementById('partCode');
+      const searchButton = document.getElementById('searchButton');
+      const clearButton = document.getElementById('clearButton');
+      const saveButton = document.getElementById('saveButton');
+      const notificationDiv = document.getElementById('notification');
+      const notificationMessage = document.getElementById('notification-message');
+      const successIcon = document.getElementById('success-icon');
+      const errorIcon = document.getElementById('error-icon');
+      const loadingPopup = document.getElementById('loadingPopup'); // Reference to the new loading popup
+      const loadingMessage = document.getElementById('loadingMessage'); // Reference to the loading message element
+      const authScreen = document.getElementById('authScreen');
+      const appContainer = document.getElementById('appContainer');
+      const loginForm = document.getElementById('loginForm');
+      const changePasswordForm = document.getElementById('changePasswordForm');
+      const authError = document.getElementById('authError');
+      const currentUser = document.getElementById('currentUser');
+      const currentRole = document.getElementById('currentRole');
+      let currentAppUser = null;
+      let partsCache = [];
+      let usersCache = [];
+      let rawCache = [];
+      let rawHeaders = [];
+      let pivotCache = [];
+      let dashboardChartRows = [];
+      const dashboardCharts = {};
+      let logsCache = [];
+      let machineCache = { numbers: [], sizes: [] };
+      let weightParts = [], selectedWeightPart = null, weightHistoryCache = [];
+      let rawExportRows = [], pivotExportRows = [], partExportRows = [], logExportRows = [];
+      let toastTimer = null;
+      const TAB_SESSION_KEY = 'purity-tab-session';
+      const SESSION_TIMEOUT_MS = 60 * 60 * 1000;
+      let sessionTimeoutTimer = null;
+
+      // ตั้งค่าวันที่ปัจจุบันให้ช่อง date
+      document.getElementById('date').valueAsDate = new Date();
+
+      // ตั้งค่ากะการผลิตเริ่มต้นเป็น 'A' เมื่อโหลดหน้าเว็บหรือล้างฟอร์ม
+      document.getElementById('shift').value = 'A';
+
+      // จัดโครงสร้าง Dashboard ใหม่และย้ายตาราง rawData ไปหน้า "ลงข้อมูลของเสีย"
+      const dashboardPage=document.getElementById('page-dashboard'),defectPage=document.getElementById('page-defects');
+      const rawHistoryPanel=document.getElementById('dashboardRawPanel'),legacyPivotPanel=document.getElementById('dashboardPivotPanel');
+      const defectEntryPanel=document.createElement('div');defectEntryPanel.id='defectEntryPanel';while(defectPage.firstChild)defectEntryPanel.appendChild(defectPage.firstChild);
+      defectPage.insertAdjacentHTML('afterbegin','<div class="mb-5 rounded-2xl border bg-white p-2 shadow-sm"><div class="flex gap-1"><button data-defect-tab="entry" class="defect-tab flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white">บันทึกข้อมูลของเสีย</button><button data-defect-tab="history" class="defect-tab flex-1 rounded-xl px-4 py-3 text-sm font-medium text-slate-500">ประวัติการบันทึกของเสีย</button></div></div>');
+      defectPage.appendChild(defectEntryPanel);rawHistoryPanel.id='defectHistoryPanel';rawHistoryPanel.classList.add('hidden');rawHistoryPanel.querySelector('h2').textContent='ประวัติการบันทึกของเสีย';rawHistoryPanel.querySelector('p').textContent='ค้นหา ตรวจสอบ แก้ไข และส่งออกข้อมูลจาก rawData';rawHistoryPanel.querySelector('[data-refresh]').dataset.refresh='defectHistory';defectPage.appendChild(rawHistoryPanel);legacyPivotPanel.remove();
+      dashboardPage.innerHTML='<div id="dashboardStats" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"></div><div class="grid gap-5 xl:grid-cols-2"><article class="chart-card xl:col-span-2"><div class="mb-5 flex items-start justify-between gap-3"><div><p class="text-xs font-semibold tracking-[.16em] text-emerald-600">DEFECT PERFORMANCE</p><h2 class="mt-1 text-xl font-semibold text-slate-800">จำนวนและเปอร์เซ็นต์ของเสีย</h2><p class="mt-1 text-sm text-slate-400">เปรียบเทียบจำนวนของเสียรวมกับอัตราของเสีย</p></div><select id="comboChartRange" class="chart-filter"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><div class="chart-wrap"><canvas id="defectComboChart"></canvas></div></article><article class="chart-card"><div class="mb-5 flex items-start justify-between gap-3"><div><p class="text-xs font-semibold tracking-[.16em] text-sky-600">TOTAL SCRAP WEIGHT</p><h2 class="mt-1 text-lg font-semibold text-slate-800">น้ำหนักของเสียรวม</h2><p class="mt-1 text-sm text-slate-400">หน่วยตัน · แปลงจากกรัม ÷ 1,000,000</p></div><select id="weightChartRange" class="chart-filter"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><div class="chart-wrap"><canvas id="weightLineChart"></canvas></div></article><article class="chart-card"><div class="mb-5 flex items-start justify-between gap-3"><div><p class="text-xs font-semibold tracking-[.16em] text-violet-600">MATERIAL ANALYSIS</p><h2 class="mt-1 text-lg font-semibold text-slate-800">น้ำหนักของเสียรายวัตถุดิบ</h2><p class="mt-1 text-sm text-slate-400">แนวโน้มแยกตาม Material · หน่วยตัน</p></div><select id="materialChartRange" class="chart-filter"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><div class="chart-wrap"><canvas id="materialLineChart"></canvas></div></article></div><article class="chart-card"><div class="mb-5"><p class="text-xs font-semibold tracking-[.16em] text-amber-600">TOP CONTRIBUTORS</p><h2 class="mt-1 text-xl font-semibold text-slate-800">Top 10 ชิ้นงานที่มีของเสียสูงสุด</h2><p class="mt-1 text-sm text-slate-400">จัดอันดับจากจำนวนของเสียรวมสะสม</p></div><div id="topPartsTable" class="overflow-auto rounded-2xl border border-slate-200"></div></article>';
+
+      // เพิ่ม event listener เพื่อแปลงข้อความเป็นตัวพิมพ์ใหญ่
+      partCodeInput.addEventListener('input', () => {
+        partCodeInput.value = partCodeInput.value.toUpperCase();
+      });
+
+      /**
+       * แสดงข้อความแจ้งเตือน
+       * @param {string} message ข้อความที่ต้องการแสดง
+       * @param {boolean} isSuccess สถานะความสำเร็จ (true: สำเร็จ, false: ล้มเหลว)
+       */
+      function showNotification(message, isSuccess) {
+        notificationMessage.textContent = message;
+        const toast = notificationDiv.querySelector('div');
+        if (isSuccess) {
+          toast.classList.add('border-emerald-200', 'text-emerald-800');
+          toast.classList.remove('border-red-200', 'text-red-700');
+          successIcon.classList.remove('hidden');
+          errorIcon.classList.add('hidden');
+        } else {
+          toast.classList.add('border-red-200', 'text-red-700');
+          toast.classList.remove('border-emerald-200', 'text-emerald-800');
+          successIcon.classList.add('hidden');
+          errorIcon.classList.remove('hidden');
+        }
+        clearTimeout(toastTimer);
+        notificationDiv.classList.remove('opacity-0', 'translate-y-[-12px]');
+        notificationDiv.classList.add('opacity-100', 'translate-y-0');
+        toastTimer = setTimeout(() => {
+          notificationDiv.classList.remove('opacity-100', 'translate-y-0');
+          notificationDiv.classList.add('opacity-0', 'translate-y-[-12px]');
+        }, 3200);
+      }
+
+      function setButtonLoading(button, loading, label) {
+        if (!button) return;
+        if (loading) { button.dataset.originalHtml = button.innerHTML; button.disabled = true; button.innerHTML = `<span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent"></span><span>${label || 'กำลังดำเนินการ...'}</span>`; button.classList.add('gap-2'); }
+        else { button.disabled = false; if (button.dataset.originalHtml) button.innerHTML = button.dataset.originalHtml; button.classList.remove('gap-2'); }
+      }
+      
+      const API_URL = '/api/sheets';
+      const AUTH_URL = '/api/auth';
+
+      async function authApi(action, data = {}) {
+        const response = await fetch(AUTH_URL, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, ...data })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'ระบบเข้าสู่ระบบขัดข้อง');
+        return result;
+      }
+
+      function showApp(user) {
+        currentAppUser = user;
+        sessionStorage.setItem(TAB_SESSION_KEY, 'active');
+        startSessionTimeout();
+        currentUser.textContent = user.displayName || user.name || user.username || user.sub;
+        currentRole.textContent = String(user.role || 'user').toUpperCase();
+        document.getElementById('addPartButton').classList.toggle('hidden', !(user.role === 'admin' || user.canEdit === true));
+        document.querySelectorAll('.add-machine-button').forEach(button=>button.classList.toggle('hidden', !(user.role === 'admin' || user.canEdit === true)));
+        const permissions = user.role === 'admin' ? ['home','dashboard','defects','weights','parts','users','logs'] : [...new Set(['home', ...(user.permissions || ['defects'])])];
+        document.querySelectorAll('[data-permission]').forEach(button => button.classList.toggle('hidden', !permissions.includes(button.dataset.permission)));
+        navigateTo(permissions.includes('home') ? 'home' : permissions[0]);
+        // เปิด App หลังหน้า Login ถูกซ่อนแล้ว ป้องกันภาพ Dashboard แวบด้านหลัง
+        appContainer.removeAttribute('data-cloak');
+        appContainer.classList.remove('hidden');
+        authScreen.classList.add('hidden');
+      }
+
+      function showLogin() {
+        clearTimeout(sessionTimeoutTimer);
+        currentAppUser = null;
+        sessionStorage.removeItem(TAB_SESSION_KEY);
+        appContainer.classList.add('hidden');
+        appContainer.setAttribute('data-cloak', '');
+        authScreen.classList.remove('hidden');
+        loginForm.classList.remove('hidden');
+        changePasswordForm.classList.add('hidden');
+        loginForm.reset();
+      }
+
+      loginForm.addEventListener('submit', async event => {
+        event.preventDefault(); authError.textContent = '';
+        const button = document.getElementById('loginButton'); setButtonLoading(button, true, 'กำลังเข้าสู่ระบบ');
+        try {
+          const result = await authApi('login', { username: document.getElementById('loginUsername').value, password: document.getElementById('loginPassword').value });
+          if (result.user.mustChangePassword) { loginForm.classList.add('hidden'); changePasswordForm.classList.remove('hidden'); }
+          else { showApp(result.user); showNotification(`ยินดีต้อนรับ ${result.user.displayName || result.user.username}`, true); }
+        } catch (error) { authError.textContent = error.message; showNotification(error.message, false); }
+        finally { setButtonLoading(button, false); }
+      });
+
+      changePasswordForm.addEventListener('submit', async event => {
+        event.preventDefault(); authError.textContent = '';
+        const password = document.getElementById('newPassword').value;
+        if (password !== document.getElementById('confirmPassword').value) { authError.textContent = 'รหัสผ่านทั้งสองช่องไม่ตรงกัน'; return; }
+        const button = document.getElementById('changePasswordButton'); button.disabled = true;
+        try { const result = await authApi('changePassword', { newPassword: password }); showApp(result.user); }
+        catch (error) { authError.textContent = error.message; }
+        finally { button.disabled = false; }
+      });
+
+      async function logoutCurrentSession(message) {
+        sessionStorage.removeItem(TAB_SESSION_KEY);
+        try { await authApi('logout'); } catch {}
+        showLogin();
+        if (message) showNotification(message, true);
+      }
+
+      function startSessionTimeout() {
+        clearTimeout(sessionTimeoutTimer);
+        sessionTimeoutTimer = setTimeout(() => logoutCurrentSession('Session หมดอายุ กรุณาเข้าสู่ระบบใหม่'), SESSION_TIMEOUT_MS);
+      }
+
+      document.getElementById('logoutButton').addEventListener('click', async event => { const button=event.currentTarget; setButtonLoading(button,true,'กำลังออกจากระบบ'); try { await logoutCurrentSession('ออกจากระบบเรียบร้อยแล้ว'); } finally { setButtonLoading(button,false); } });
+
+      if (sessionStorage.getItem(TAB_SESSION_KEY) === 'active') {
+        authApi('status').then(result => {
+          if (result.user.mustChangePassword) { loginForm.classList.add('hidden'); changePasswordForm.classList.remove('hidden'); }
+          else showApp(result.user);
+        }).catch(() => { sessionStorage.removeItem(TAB_SESSION_KEY); showLogin(); });
+      } else {
+        // แท็บใหม่ไม่มี tab-session: ล้าง cookie เดิมก่อนแสดง Login
+        authApi('logout').catch(() => {}).finally(showLogin);
+      }
+
+      async function callApi(options = {}) {
+        const response = await fetch(API_URL, options);
+        let result;
+        try {
+          result = await response.json();
+        } catch {
+          throw new Error('API ตอบกลับในรูปแบบที่ไม่ถูกต้อง');
+        }
+        if (!response.ok) {
+          if (response.status === 401) showLogin();
+          throw new Error(result.error || result.message || `HTTP ${response.status}`);
+        }
+        return result;
+      }
+
+      async function apiPost(action, data) {
+        return callApi({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...(data === undefined ? {} : { data }) }) });
+      }
+
+      const pageMeta = {
+        home: ['หน้าหลัก', 'Purity Plastic Overall'], dashboard: ['Dashboard', 'แสดงข้อมูลภาพรวมของเสียจากงานฉีดพลาสติก'],
+        defects: ['ลงข้อมูลของเสีย', 'บันทึกข้อมูลการผลิตและของเสีย'], weights: ['บันทึกน้ำหนักชิ้นงาน', 'ตรวจสอบน้ำหนักมาตรฐานและบันทึกผล'], parts: ['ตั้งค่าฐานข้อมูล', 'จัดการข้อมูลบน DB'],
+        users: ['ตั้งค่าผู้ใช้งาน', 'กำหนดบทบาทและสิทธิ์การเข้าถึง'], logs: ['Log', 'ประวัติการทำรายการในระบบ']
+      };
+
+      function navigateTo(page) {
+        const target = document.getElementById(`page-${page}`);
+        const nav = document.querySelector(`.nav-item[data-page="${page}"]`);
+        if (!target || !nav || nav.classList.contains('hidden')) return;
+        document.querySelectorAll('.app-page').forEach(section => section.classList.add('hidden'));
+        target.classList.remove('hidden');
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('bg-emerald-500/15','text-emerald-300'));
+        nav.classList.add('bg-emerald-500/15','text-emerald-300');
+        document.getElementById('pageTitle').textContent = pageMeta[page][0];
+        document.getElementById('pageSubtitle').textContent = pageMeta[page][1];
+        closeSidebar();
+        if (page === 'dashboard') loadDashboard();
+        if (page === 'parts') { loadParts(); loadMachines(); }
+        if (page === 'defects') loadFormMasters();
+        if (page === 'weights') loadWeightModule();
+        if (page === 'users') loadUsers();
+        if (page === 'logs') loadLogs();
+      }
+
+      function closeSidebar() { document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('sidebarBackdrop').classList.add('hidden'); }
+      function openSidebar() { document.getElementById('sidebar').classList.remove('-translate-x-full'); document.getElementById('sidebarBackdrop').classList.remove('hidden'); }
+      function setSidebarCollapsed(collapsed) {
+        appContainer.classList.toggle('sidebar-collapsed', collapsed);
+        const button = document.getElementById('sidebarCollapseButton');
+        button.title = collapsed ? 'ขยาย Sidebar' : 'ย่อ Sidebar';
+        button.setAttribute('aria-label', button.title);
+        localStorage.setItem('purity-sidebar-collapsed', collapsed ? '1' : '0');
+      }
+      document.getElementById('menuButton').addEventListener('click', openSidebar);
+      document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebar);
+      document.getElementById('sidebarCollapseButton').addEventListener('click', () => setSidebarCollapsed(!appContainer.classList.contains('sidebar-collapsed')));
+      setSidebarCollapsed(localStorage.getItem('purity-sidebar-collapsed') === '1');
+      document.querySelectorAll('.nav-item').forEach(button => button.addEventListener('click', () => navigateTo(button.dataset.page)));
+      document.querySelectorAll('[data-go]').forEach(button => button.addEventListener('click', () => navigateTo(button.dataset.go)));
+      document.querySelectorAll('[data-refresh]').forEach(button => button.addEventListener('click', async () => { button.classList.add('animate-spin'); try { if(button.dataset.refresh==='dashboard') await loadDashboard(); else if(button.dataset.refresh==='defectHistory') await loadDefectHistory(); else await loadLogs(); } finally { button.classList.remove('animate-spin'); } }));
+      document.querySelectorAll('.defect-tab').forEach(button=>button.addEventListener('click',()=>{const entry=button.dataset.defectTab==='entry';document.getElementById('defectEntryPanel').classList.toggle('hidden',!entry);document.getElementById('defectHistoryPanel').classList.toggle('hidden',entry);document.querySelectorAll('.defect-tab').forEach(item=>{item.classList.remove('bg-emerald-600','text-white');item.classList.add('text-slate-500');});button.classList.add('bg-emerald-600','text-white');button.classList.remove('text-slate-500');if(!entry)loadDefectHistory();}));
+
+      function openModal(id) { const modal=document.getElementById(id); modal.classList.remove('hidden','modal-leave'); modal.classList.add('flex','modal-enter'); setTimeout(()=>modal.classList.remove('modal-enter'),280); document.body.classList.add('overflow-hidden'); }
+      function closeModal(id) { const modal=document.getElementById(id); modal.classList.add('modal-leave'); setTimeout(()=>{modal.classList.add('hidden');modal.classList.remove('flex','modal-leave');},180); document.body.classList.remove('overflow-hidden'); }
+      document.querySelectorAll('[data-close-modal]').forEach(button=>button.addEventListener('click',()=>closeModal(button.dataset.closeModal)));
+
+      function confirmAction(title, message) {
+        return new Promise(resolve => {
+          const overlay=document.createElement('div');overlay.className='fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm modal-enter';
+          overlay.innerHTML=`<div class="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl"><div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-2xl text-rose-600">!</div><h3 class="mt-4 text-xl font-semibold">${escapeHtml(title)}</h3><p class="mt-2 text-sm text-slate-500">${escapeHtml(message)}</p><div class="mt-6 grid grid-cols-2 gap-3"><button data-confirm="no" class="rounded-xl border px-4 py-2.5">ยกเลิก</button><button data-confirm="yes" class="rounded-xl bg-rose-600 px-4 py-2.5 font-semibold text-white">ยืนยันการลบ</button></div></div>`;
+          document.body.appendChild(overlay);overlay.querySelectorAll('[data-confirm]').forEach(button=>button.addEventListener('click',()=>{const answer=button.dataset.confirm==='yes';overlay.classList.add('modal-leave');setTimeout(()=>overlay.remove(),180);resolve(answer);}));
+        });
+      }
+
+      const permissionChecks=document.getElementById('permissionChecks');
+      if (permissionChecks && !permissionChecks.querySelector('input[value="home"]')) permissionChecks.insertAdjacentHTML('afterbegin','<label><input type="checkbox" value="home" checked> หน้าหลัก</label>');
+      if (permissionChecks && !permissionChecks.querySelector('input[value="weights"]')) permissionChecks.insertAdjacentHTML('beforeend','<label><input type="checkbox" value="weights"> บันทึกน้ำหนักชิ้นงาน</label>');
+      if (permissionChecks && !document.querySelector('[name="canEdit"]')) permissionChecks.closest('fieldset').insertAdjacentHTML('afterend','<fieldset class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 sm:col-span-2"><legend class="px-2 text-sm font-medium text-amber-900">สิทธิ์จัดการข้อมูล</legend><div class="grid gap-3 text-sm sm:grid-cols-2"><label class="flex items-center gap-2"><input name="canEdit" type="checkbox" value="true" class="h-4 w-4 rounded border-slate-300 text-emerald-600"> สามารถเพิ่ม/แก้ไขข้อมูล</label><label class="flex items-center gap-2"><input name="canDelete" type="checkbox" value="true" class="h-4 w-4 rounded border-slate-300 text-rose-600"> สามารถลบข้อมูล</label></div><p class="mt-3 text-xs text-amber-700">Admin มีสิทธิ์ทั้งสองรายการโดยอัตโนมัติ</p></fieldset>');
+      function addCsvButton(panelId, id) { const refresh=document.querySelector(`#${panelId} [data-refresh]`); if(refresh&&!document.getElementById(id)) refresh.insertAdjacentHTML('beforebegin',`<button id="${id}" title="Export CSV" class="rounded-xl border px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">⇩ CSV</button>`); }
+      addCsvButton('defectHistoryPanel','exportRawCsv'); addCsvButton('page-logs','exportLogsCsv');
+      document.getElementById('machinesDbPanel').insertAdjacentHTML('afterbegin','<div class="flex justify-end"><button id="exportMachinesCsv" class="rounded-xl border bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50">⇩ Export CSV ฐานข้อมูลเครื่องฉีด</button></div>');
+      document.getElementById('exportPartsCsv').title='Export CSV ฐานข้อมูลชิ้นงาน'; document.getElementById('exportMachinesCsv').title='Export CSV ฐานข้อมูลเครื่องฉีด';
+      document.body.insertAdjacentHTML('beforeend','<div id="weightEditModal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><div class="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl"><div class="flex items-center justify-between border-b bg-slate-50 px-6 py-5"><div><h2 class="text-xl font-semibold">แก้ไขประวัติน้ำหนัก</h2><p id="weightEditSubtitle" class="text-sm text-slate-400"></p></div><button type="button" id="closeWeightEdit" class="flex h-9 w-9 items-center justify-center rounded-full text-xl text-slate-400 hover:bg-white">×</button></div><form id="weightEditForm" class="grid gap-4 p-6 sm:grid-cols-2"><input type="hidden" name="rowNumber"><label class="text-sm text-slate-600">วันที่<input name="date" type="date" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">เวลา<input name="time" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">น้ำหนักจริง<input name="actualWeight" type="number" step="0.001" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600">Tolerance<input name="tolerance" type="number" step="0.001" min="0" required class="mt-1 w-full rounded-xl border px-4 py-3"></label><label class="text-sm text-slate-600 sm:col-span-2">หมายเหตุ<textarea name="remark" rows="3" class="mt-1 w-full rounded-xl border px-4 py-3"></textarea></label><div class="flex justify-end gap-3 border-t pt-5 sm:col-span-2"><button type="button" id="cancelWeightEdit" class="rounded-xl border px-5 py-2.5">ยกเลิก</button><button class="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white">บันทึกการแก้ไข</button></div></form></div></div>');
+      function exportCsv(filename, headers, rows) { if(!rows.length){showNotification('ไม่มีข้อมูลสำหรับ Export',false);return;} const escape=value=>`"${String(value??'').replace(/"/g,'""')}"`; const csv='\uFEFF'+[headers,...rows].map(row=>row.map(escape).join(',')).join('\r\n'); const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); const link=document.createElement('a');link.href=url;link.download=`${filename}-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);showNotification('Export CSV เรียบร้อยแล้ว',true); }
+      document.getElementById('exportRawCsv').addEventListener('click',()=>exportCsv('rawData',rawHeaders,rawExportRows));
+      document.getElementById('exportPartsCsv').addEventListener('click',()=>exportCsv('parts-database',['ID Code','Part Code','Part Name','Material','Part W.','Runner W.','Price'],partExportRows.map(item=>[item.idCode,item.partCode,item.partName,item.material,item.partWeight,item.runnerWeight,item.price])));
+      document.getElementById('exportMachinesCsv').addEventListener('click',()=>{const count=Math.max((machineCache.numbers||[]).length,(machineCache.sizes||[]).length);exportCsv('machine-database',['M/C No.','M/C Size (Ton)'],Array.from({length:count},(_,i)=>[(machineCache.numbers||[])[i]||'',(machineCache.sizes||[])[i]||'']));});
+      document.getElementById('exportLogsCsv').addEventListener('click',()=>exportCsv('audit-log',['เวลา','ผู้ใช้','Action','รายละเอียด','สถานะ'],logExportRows));
+      document.querySelectorAll('input[type="password"]').forEach((input,index)=>{if(!input.id)input.id=`passwordField${index}`;if(!document.querySelector(`[data-toggle-password="${input.id}"]`)){input.parentElement.classList.add('relative');input.classList.add('pr-12');input.insertAdjacentHTML('afterend',`<button type="button" data-toggle-password="${input.id}" title="แสดงรหัสผ่าน" class="absolute bottom-2 right-2 rounded-lg p-2 text-slate-400 hover:bg-slate-100">◉</button>`);}});
+      document.querySelectorAll('[data-toggle-password]').forEach(button=>button.addEventListener('click',()=>{const input=document.getElementById(button.dataset.togglePassword);const visible=input.type==='text';input.type=visible?'password':'text';button.textContent=visible?'◉':'◎';button.title=visible?'แสดงรหัสผ่าน':'ซ่อนรหัสผ่าน';}));
+
+      function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char])); }
+      function formatNumber(value) { return new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2 }).format(Number(value) || 0); }
+      const loadingMarkup = '<div class="flex items-center justify-center gap-3 py-12 text-sm text-slate-400"><span class="h-5 w-5 animate-spin rounded-full border-2 border-emerald-500 border-r-transparent"></span>กำลังโหลดข้อมูล...</div>';
+      function statCards(summary) {
+        const cards = [
+          ['รายการทั้งหมด', summary.records, 'รายการ', '▦', 'from-slate-900 to-slate-800', 'text-sky-300'],
+          ['จำนวนของดี', summary.totalGood, 'ชิ้น', '✓', 'from-emerald-950 to-emerald-800', 'text-emerald-300'],
+          ['จำนวนของเสีย', summary.totalDefect, 'ชิ้น', '!', 'from-rose-950 to-rose-800', 'text-rose-300'],
+          ['มูลค่าของเสีย', summary.totalCost, 'บาท', '฿', 'from-indigo-950 to-indigo-800', 'text-indigo-300']
+        ];
+        return cards.map(([label,value,unit,icon,bg,accent]) => `<div class="group relative overflow-hidden rounded-3xl bg-gradient-to-br ${bg} p-6 text-white shadow-xl transition hover:-translate-y-1 hover:shadow-2xl"><div class="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/5 transition group-hover:scale-125"></div><div class="relative flex items-start justify-between"><div><p class="text-sm font-light text-white/55">${label}</p><p class="mt-3 text-3xl font-semibold tracking-tight">${formatNumber(value)}</p><p class="mt-1 text-xs text-white/40">${unit}</p></div><div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-xl ${accent}">${icon}</div></div></div>`).join('');
+      }
+      function renderMatrix(matrix, headers) {
+        if (!matrix || !matrix.length) return '<p class="py-8 text-center text-slate-400">ไม่มีข้อมูล</p>';
+        const rows = headers ? matrix : matrix.slice(1), head = headers || matrix[0];
+        return `<table class="min-w-full whitespace-nowrap text-sm"><thead><tr class="border-b bg-slate-50">${head.map(cell=>`<th class="px-3 py-3 text-left font-medium text-slate-500">${escapeHtml(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr class="border-b last:border-0 hover:bg-slate-50">${head.map((_,i)=>`<td class="px-3 py-3 text-slate-600">${escapeHtml(row[i])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      }
+
+      function chartDate(value){const text=String(value||'').trim();let date=new Date(text);if(!isNaN(date))return date;const parts=text.split(/[\/\-]/).map(Number);if(parts.length===3){date=parts[0]>1900?new Date(parts[0],parts[1]-1,parts[2]):new Date(parts[2],parts[1]-1,parts[0]);}return isNaN(date)?null:date;}
+      function bucketInfo(value,range){const date=chartDate(value);if(!date)return null;const pad=n=>String(n).padStart(2,'0');if(range==='monthly'){const key=`${date.getFullYear()}-${pad(date.getMonth()+1)}`;return {key,label:date.toLocaleDateString('th-TH',{month:'short',year:'2-digit'})};}if(range==='weekly'){const day=(date.getDay()+6)%7,monday=new Date(date);monday.setDate(date.getDate()-day);const key=`${monday.getFullYear()}-${pad(monday.getMonth()+1)}-${pad(monday.getDate())}`;return {key,label:`สัปดาห์ ${monday.toLocaleDateString('th-TH',{day:'2-digit',month:'short'})}`};}const key=`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;return {key,label:date.toLocaleDateString('th-TH',{day:'2-digit',month:'short'})};}
+      function groupedRows(range){const map=new Map();dashboardChartRows.forEach(row=>{const bucket=bucketInfo(row.date,range);if(!bucket)return;if(!map.has(bucket.key))map.set(bucket.key,{...bucket,defect:0,total:0,weightTon:0,materials:{}});const item=map.get(bucket.key);item.defect+=Number(row.defect)||0;item.total+=Number(row.total)||0;const ton=(Number(row.weightGram)||0)/1000000;item.weightTon+=ton;item.materials[row.material||'ไม่ระบุ']=(item.materials[row.material||'ไม่ระบุ']||0)+ton;});const limit=range==='daily'?31:range==='weekly'?26:24;return [...map.values()].sort((a,b)=>a.key.localeCompare(b.key)).slice(-limit);}
+      function chartOptions(yTitle,percentAxis=false){return {responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:{duration:850,easing:'easeOutQuart'},plugins:{legend:{position:'top',align:'end',labels:{usePointStyle:true,pointStyle:'circle',boxWidth:8,padding:18,font:{family:'Kanit'}}},tooltip:{backgroundColor:'rgba(15,23,42,.94)',padding:13,titleFont:{family:'Kanit',size:13},bodyFont:{family:'Kanit',size:12},cornerRadius:12,displayColors:true}},scales:{x:{grid:{display:false},ticks:{font:{family:'Kanit'},color:'#64748b',maxRotation:0,autoSkip:true,maxTicksLimit:12}},y:{beginAtZero:true,grid:{color:'rgba(148,163,184,.14)'},title:{display:true,text:yTitle,font:{family:'Kanit'}},ticks:{font:{family:'Kanit'},color:'#64748b'}},...(percentAxis?{y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'เปอร์เซ็นต์ (%)',font:{family:'Kanit'}},ticks:{callback:value=>value+'%',font:{family:'Kanit'},color:'#059669'}}}:{})}};}
+      function replaceChart(key,canvasId,config){if(dashboardCharts[key])dashboardCharts[key].destroy();dashboardCharts[key]=new Chart(document.getElementById(canvasId),config);}
+      function renderComboChart(){const rows=groupedRows(document.getElementById('comboChartRange').value),ctx=document.getElementById('defectComboChart').getContext('2d'),gradient=ctx.createLinearGradient(0,0,0,320);gradient.addColorStop(0,'rgba(244,63,94,.88)');gradient.addColorStop(1,'rgba(251,113,133,.28)');replaceChart('combo','defectComboChart',{type:'bar',data:{labels:rows.map(x=>x.label),datasets:[{type:'bar',label:'จำนวนของเสีย',data:rows.map(x=>x.defect),backgroundColor:gradient,borderColor:'#f43f5e',borderWidth:1,borderRadius:8,maxBarThickness:38,yAxisID:'y'},{type:'line',label:'เปอร์เซ็นต์ของเสีย',data:rows.map(x=>x.total?x.defect/x.total*100:0),borderColor:'#10b981',backgroundColor:'#10b981',pointBackgroundColor:'#fff',pointBorderColor:'#10b981',pointBorderWidth:2,pointRadius:3,pointHoverRadius:7,tension:.38,yAxisID:'y1'}]},options:chartOptions('จำนวน (ชิ้น)',true)});}
+      function renderWeightChart(){const rows=groupedRows(document.getElementById('weightChartRange').value),ctx=document.getElementById('weightLineChart').getContext('2d'),gradient=ctx.createLinearGradient(0,0,0,320);gradient.addColorStop(0,'rgba(14,165,233,.30)');gradient.addColorStop(1,'rgba(14,165,233,0)');replaceChart('weight','weightLineChart',{type:'line',data:{labels:rows.map(x=>x.label),datasets:[{label:'น้ำหนักของเสียรวม (ตัน)',data:rows.map(x=>x.weightTon),borderColor:'#0ea5e9',backgroundColor:gradient,fill:true,tension:.4,pointRadius:3,pointHoverRadius:7,pointBackgroundColor:'#fff',pointBorderColor:'#0ea5e9',pointBorderWidth:2}]},options:chartOptions('น้ำหนัก (ตัน)')});}
+      function renderMaterialChart(){const rows=groupedRows(document.getElementById('materialChartRange').value),materials=[...new Set(rows.flatMap(x=>Object.keys(x.materials)))],colors=['#8b5cf6','#10b981','#f59e0b','#0ea5e9','#f43f5e','#14b8a6','#6366f1','#84cc16'];replaceChart('material','materialLineChart',{type:'line',data:{labels:rows.map(x=>x.label),datasets:materials.map((material,index)=>({label:material,data:rows.map(x=>x.materials[material]||0),borderColor:colors[index%colors.length],backgroundColor:colors[index%colors.length],tension:.38,pointRadius:2,pointHoverRadius:6,borderWidth:2}))},options:chartOptions('น้ำหนัก (ตัน)')});}
+      function renderTopParts(){const map=new Map();dashboardChartRows.forEach(row=>{const key=row.partCode||row.partName||'ไม่ระบุ';if(!map.has(key))map.set(key,{code:row.partCode,name:row.partName,defect:0});map.get(key).defect+=Number(row.defect)||0;});const rows=[...map.values()].sort((a,b)=>b.defect-a.defect).slice(0,10),max=rows[0]?.defect||1;document.getElementById('topPartsTable').innerHTML=rows.length?`<table class="min-w-full text-sm"><thead><tr class="border-b bg-slate-100"><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">อันดับ</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">ชิ้นงาน</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">สัดส่วน</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">ของเสียรวม</th></tr></thead><tbody>${rows.map((row,index)=>`<tr class="border-b last:border-0"><td class="px-4 py-3"><span class="inline-flex h-7 w-7 items-center justify-center rounded-full ${index<3?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-500'} font-semibold">${index+1}</span></td><td class="px-4 py-3"><p class="font-semibold text-slate-800">${escapeHtml(row.code)}</p><p class="text-xs text-slate-400">${escapeHtml(row.name)}</p></td><td class="min-w-[220px] px-4 py-3"><div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-rose-500 to-amber-400" style="width:${Math.max(3,row.defect/max*100)}%"></div></div></td><td class="px-4 py-3 text-right text-base font-semibold text-rose-600">${formatNumber(row.defect)}</td></tr>`).join('')}</tbody></table>`:'<p class="py-10 text-center text-slate-400">ไม่มีข้อมูล</p>';}
+      function renderDashboardVisuals(){if(typeof Chart==='undefined'){showNotification('ไม่สามารถโหลดระบบกราฟได้',false);return;}renderComboChart();renderWeightChart();renderMaterialChart();renderTopParts();}
+
+      async function loadDashboard() {
+        const canDashboard = currentAppUser?.role === 'admin' || (currentAppUser?.permissions || []).includes('dashboard');
+        if (!canDashboard) return;
+        try {
+          document.getElementById('rawDataTable').innerHTML=loadingMarkup;
+          const result = await apiPost('dashboard');
+          document.getElementById('dashboardStats').innerHTML = statCards(result.summary);
+          rawHeaders = (result.rawHeaders && result.rawHeaders.length) ? result.rawHeaders : Array.from({length:((result.rawRows||[])[0]?.values || (result.rawRows||[])[0] || []).length},(_,index)=>`Column ${index+1}`);
+          rawCache = (result.rawRows || []).map((item,index) => Array.isArray(item) ? { rowNumber: null, values: item } : { rowNumber: item.rowNumber, values: item.values || [] });
+          dashboardChartRows=result.chartRows||[];
+          document.getElementById('rawDataTable').classList.add('h-[520px]','overflow-auto','rounded-xl','border');
+          applyRawFilters();renderDashboardVisuals();
+        } catch (error) { showNotification(error.message, false); }
+      }
+
+      async function loadDefectHistory(){try{document.getElementById('rawDataTable').innerHTML=loadingMarkup;const result=await apiPost('defectHistory');rawHeaders=(result.rawHeaders&&result.rawHeaders.length)?result.rawHeaders:[];rawCache=(result.rawRows||[]).map(item=>Array.isArray(item)?{rowNumber:null,values:item}:{rowNumber:item.rowNumber,values:item.values||[]});document.getElementById('rawDataTable').classList.add('h-[520px]','overflow-auto','rounded-xl','border');applyRawFilters();}catch(error){showNotification(error.message,false);}}
+
+      document.querySelectorAll('.dashboard-tab').forEach(button=>button.addEventListener('click',()=>{
+        const raw=button.dataset.dashboardTab==='raw';
+        document.getElementById('dashboardRawPanel').classList.toggle('hidden',!raw); document.getElementById('dashboardPivotPanel').classList.toggle('hidden',raw);
+        document.querySelectorAll('.dashboard-tab').forEach(item=>{item.classList.remove('bg-emerald-600','text-white');item.classList.add('text-slate-500')});
+        button.classList.add('bg-emerald-600','text-white');button.classList.remove('text-slate-500');
+      }));
+
+      function applyRawFilters(){ const q=document.getElementById('rawSearch').value.toLowerCase(),date=document.getElementById('rawDateFilter').value; const rows=rawCache.filter(item=>{const values=item.values||[];return(!q||values.some(v=>String(v).toLowerCase().includes(q)))&&(!date||String(values[0]).includes(date));}); rawExportRows=rows.map(item=>item.values); renderRawRows(rows); }
+      function renderRawRows(rows){
+        const headers=rawHeaders.slice(0,17); const canEdit=currentAppUser?.role==='admin'||currentAppUser?.canEdit===true; const canDelete=currentAppUser?.role==='admin'||currentAppUser?.canDelete===true; const canManage=canEdit||canDelete;
+        document.getElementById('rawDataTable').innerHTML = rows.length ? `<table class="min-w-full whitespace-nowrap text-sm"><thead class="sticky top-0 z-10"><tr class="border-b bg-slate-100">${headers.map(h=>`<th class="px-3 py-3 text-left font-medium text-slate-500">${escapeHtml(h)}</th>`).join('')}${canManage?'<th class="sticky right-0 bg-slate-100 px-3 py-3">จัดการ</th>':''}</tr></thead><tbody>${rows.map((item,index)=>`<tr class="border-b hover:bg-slate-50">${headers.map((_,i)=>`<td class="px-3 py-3 text-slate-600">${escapeHtml(item.values[i])}</td>`).join('')}${canManage&&item.rowNumber?`<td class="sticky right-0 bg-white px-3 py-2"><div class="flex gap-1">${canEdit?`<button data-edit-raw="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50">แก้ไข</button>`:''}${canDelete?`<button data-delete-raw="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50">ลบ</button>`:''}</div></td>`:''}</tr>`).join('')}</tbody></table>`:'<p class="py-10 text-center text-slate-400">ไม่พบข้อมูล</p>';
+        document.querySelectorAll('[data-edit-raw]').forEach(button=>button.addEventListener('click',()=>openRawEditor(rows[Number(button.dataset.editRaw)])));
+        document.querySelectorAll('[data-delete-raw]').forEach(button=>button.addEventListener('click',async()=>{const item=rows[Number(button.dataset.deleteRaw)];if(!await confirmAction('ลบข้อมูล rawData','รายการนี้จะถูกลบถาวรและบันทึกลง Audit Log'))return;try{const result=await apiPost('deleteRawData',{rowNumber:item.rowNumber});showNotification(result.message,true);loadDefectHistory();}catch(error){showNotification(error.message,false);}}));
+      }
+      document.getElementById('rawSearch').addEventListener('input',applyRawFilters); document.getElementById('rawDateFilter').addEventListener('change',applyRawFilters);
+      document.getElementById('comboChartRange').addEventListener('change',renderComboChart);document.getElementById('weightChartRange').addEventListener('change',renderWeightChart);document.getElementById('materialChartRange').addEventListener('change',renderMaterialChart);
+      function openRawEditor(item){const form=document.getElementById('rawEditForm');form.elements.rowNumber.value=item.rowNumber;document.getElementById('rawModalSubtitle').textContent=`แถวที่ ${item.rowNumber} · ${item.values[1]||''}`;document.getElementById('rawEditFields').innerHTML=rawHeaders.map((header,index)=>`<label class="text-sm text-slate-600">${escapeHtml(header||`Column ${index+1}`)}<input name="field-${index}" value="${escapeHtml(item.values[index]||'')}" class="mt-1 w-full rounded-xl border px-3 py-2.5"></label>`).join('');openModal('rawModal');}
+      document.getElementById('rawEditForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setButtonLoading(button,true,'กำลังบันทึก');const data={rowNumber:Number(event.target.elements.rowNumber.value),values:rawHeaders.map((_,i)=>event.target.elements[`field-${i}`].value)};try{const result=await apiPost('updateRawData',data);showNotification(result.message,true);closeModal('rawModal');await loadDefectHistory();}catch(error){showNotification(error.message,false);}finally{setButtonLoading(button,false);}});
+
+      async function loadParts() {
+        try { document.getElementById('partsTable').innerHTML=loadingMarkup;const result = await apiPost('parts'); partsCache = result.rows || []; renderParts(partsCache); }
+        catch (error) { showNotification(error.message, false); }
+      }
+      function renderParts(rows) {
+        partExportRows=rows;
+        const canEdit=currentAppUser?.role==='admin'||currentAppUser?.canEdit===true; const canDelete=currentAppUser?.role==='admin'||currentAppUser?.canDelete===true;
+        document.getElementById('partsTable').innerHTML = rows.length?`<table class="min-w-full whitespace-nowrap text-sm"><thead><tr class="border-b bg-slate-50">${['ID Code','Part Code','Part Name','Material','Part W.','Runner W.','Price','จัดการ'].map(h=>`<th class="px-3 py-3 text-left font-medium text-slate-500">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((item,index)=>`<tr class="border-b hover:bg-slate-50"><td class="px-3 py-3 font-medium">${escapeHtml(item.idCode)}</td><td class="px-3 py-3">${escapeHtml(item.partCode)}</td><td class="px-3 py-3">${escapeHtml(item.partName)}</td><td class="px-3 py-3">${escapeHtml(item.material)}</td><td class="px-3 py-3">${escapeHtml(item.partWeight)}</td><td class="px-3 py-3">${escapeHtml(item.runnerWeight)}</td><td class="px-3 py-3">${escapeHtml(item.price)}</td><td class="px-3 py-2"><div class="flex gap-1">${canEdit?`<button data-edit-part="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-emerald-700">แก้ไข</button>`:''}${canDelete?`<button data-delete-part="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-rose-600">ลบ</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:'<p class="py-10 text-center text-slate-400">ไม่พบชิ้นงาน</p>';
+        document.querySelectorAll('[data-edit-part]').forEach(button=>button.addEventListener('click',()=>openPartEditor(rows[Number(button.dataset.editPart)])));
+        document.querySelectorAll('[data-delete-part]').forEach(button=>button.addEventListener('click',async()=>{const item=rows[Number(button.dataset.deletePart)];if(!await confirmAction('ลบชิ้นงาน',`${item.idCode} · ${item.partName}`))return;try{const result=await apiPost('deletePart',{idCode:item.idCode});showNotification(result.message,true);loadParts();}catch(error){showNotification(error.message,false);}}));
+      }
+      document.getElementById('partFilter').addEventListener('input', event => { const q=event.target.value.toLowerCase(); renderParts(partsCache.filter(item=>Object.values(item).some(value=>String(value).toLowerCase().includes(q)))); });
+      function openPartEditor(item=null){const form=document.getElementById('partForm');form.reset();document.getElementById('partModalTitle').textContent=item?'แก้ไขชิ้นงาน':'เพิ่มชิ้นงาน';if(item)Object.entries(item).forEach(([key,value])=>{if(form.elements[key])form.elements[key].value=value});openModal('partModal');}
+      document.getElementById('addPartButton').addEventListener('click',()=>openPartEditor());
+      document.getElementById('partForm').addEventListener('submit', async event => { event.preventDefault(); const button=event.submitter;setButtonLoading(button,true,'กำลังบันทึก');const data=Object.fromEntries(new FormData(event.target)); try { const result=await apiPost('savePart',data); showNotification(result.message,true); closeModal('partModal'); await loadParts(); } catch(error){ showNotification(error.message,false); } finally{setButtonLoading(button,false);} });
+
+      async function loadFormMasters(){
+        try {
+          const [partsResult,machinesResult]=await Promise.all([apiPost('parts'),apiPost('machines')]);
+          partsCache=partsResult.rows||[]; machineCache=machinesResult.data||{numbers:[],sizes:[]};
+          document.getElementById('partCodeOptions').innerHTML=partsCache.map(item=>`<option value="${escapeHtml(item.idCode)}">${escapeHtml(item.partName||item.partCode)}</option>`).join('');
+          fillMachineOptions();
+        } catch(error){showNotification(error.message,false);}
+      }
+      function fillMachineOptions(){
+        document.getElementById('mcNoOptions').innerHTML=(machineCache.numbers||[]).map(value=>`<option value="${escapeHtml(value)}">M/C ${escapeHtml(value)}</option>`).join('');
+        document.getElementById('mcSizeOptions').innerHTML=(machineCache.sizes||[]).map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)} Ton</option>`).join('');
+      }
+      async function loadMachines(){
+        try{const result=await apiPost('machines');machineCache=result.data||{numbers:[],sizes:[]};fillMachineOptions();renderMachines();}
+        catch(error){showNotification(error.message,false);}
+      }
+      function renderMachineTable(category,rows,targetId){
+        const canEdit=currentAppUser?.role==='admin'||currentAppUser?.canEdit===true,canDelete=currentAppUser?.role==='admin'||currentAppUser?.canDelete===true;
+        document.getElementById(targetId).innerHTML=rows.length?`<table class="min-w-full text-sm"><thead><tr class="border-b bg-slate-50"><th class="px-3 py-3 text-left font-medium text-slate-500">รายการ</th><th class="px-3 py-3 text-right font-medium text-slate-500">จัดการ</th></tr></thead><tbody>${rows.map((value,index)=>`<tr class="border-b last:border-0"><td class="px-3 py-3 font-medium">${category==='number'?'M/C ':''}${escapeHtml(value)}${category==='size'?' Ton':''}</td><td class="px-3 py-2"><div class="flex justify-end gap-1">${canEdit?`<button data-edit-machine="${category}:${index}" class="rounded-lg border px-3 py-1.5 text-xs text-emerald-700">แก้ไข</button>`:''}${canDelete?`<button data-delete-machine="${category}:${index}" class="rounded-lg border px-3 py-1.5 text-xs text-rose-600">ลบ</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:'<p class="py-8 text-center text-slate-400">ไม่พบข้อมูล</p>';
+      }
+      function renderMachines(){renderMachineTable('number',machineCache.numbers||[],'machineNumbersTable');renderMachineTable('size',machineCache.sizes||[],'machineSizesTable');document.querySelectorAll('[data-edit-machine]').forEach(button=>button.addEventListener('click',()=>{const [category,index]=button.dataset.editMachine.split(':');openMachineEditor(category,(category==='number'?machineCache.numbers:machineCache.sizes)[Number(index)]);}));document.querySelectorAll('[data-delete-machine]').forEach(button=>button.addEventListener('click',async()=>{const [category,index]=button.dataset.deleteMachine.split(':');const value=(category==='number'?machineCache.numbers:machineCache.sizes)[Number(index)];if(!await confirmAction('ลบข้อมูลเครื่องฉีด',category==='number'?`M/C ${value}`:`${value} Ton`))return;try{const result=await apiPost('deleteMachine',{category,value});showNotification(result.message,true);await loadMachines();}catch(error){showNotification(error.message,false);}}));}
+      function openMachineEditor(category,value=''){const form=document.getElementById('machineForm');form.reset();form.elements.category.value=category;form.elements.oldValue.value=value;form.elements.value.value=value;document.getElementById('machineModalTitle').textContent=`${value?'แก้ไข':'เพิ่ม'}${category==='number'?'หมายเลข':'ขนาด'}เครื่องฉีด`;document.getElementById('machineValueLabel').textContent=category==='number'?'หมายเลขเครื่อง (ไม่ต้องใส่ M/C)':'ขนาดเครื่อง (ไม่ต้องใส่ Ton)';openModal('machineModal');}
+      document.querySelectorAll('[data-add-machine]').forEach(button=>button.addEventListener('click',()=>openMachineEditor(button.dataset.addMachine)));
+      document.getElementById('machineForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setButtonLoading(button,true,'กำลังบันทึก');try{const result=await apiPost('saveMachine',Object.fromEntries(new FormData(event.target)));showNotification(result.message,true);closeModal('machineModal');await loadMachines();}catch(error){showNotification(error.message,false);}finally{setButtonLoading(button,false);}});
+      document.querySelectorAll('.db-tab').forEach(button=>button.addEventListener('click',()=>{const parts=button.dataset.dbTab==='parts';document.getElementById('partsDbPanel').classList.toggle('hidden',!parts);document.getElementById('machinesDbPanel').classList.toggle('hidden',parts);document.querySelectorAll('.db-tab').forEach(item=>{item.classList.remove('bg-emerald-600','text-white');item.classList.add('text-slate-500');});button.classList.add('bg-emerald-600','text-white');button.classList.remove('text-slate-500');}));
+      document.getElementById('partCode').addEventListener('change',()=>document.getElementById('searchButton').click());
+
+      async function loadWeightModule(){
+        try{const result=await apiPost('weightInitial');weightParts=result.parts||[];document.getElementById('weightPartOptions').innerHTML=weightParts.map(item=>`<option value="${escapeHtml(item.idCode)}">${escapeHtml(item.partCode)} · ${escapeHtml(item.partName)}</option>`).join('');document.getElementById('weightTime').innerHTML='<option value="">เลือกเวลา</option>'+((result.times||[]).map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join(''));document.getElementById('weightDate').valueAsDate=new Date();await loadWeightHistory();}catch(error){showNotification(error.message,false);}
+      }
+      function updateWeightCalculation(){const tolerance=Number(document.getElementById('weightTolerance').value||0),actualText=document.getElementById('weightActual').value; if(!selectedWeightPart)return;const std=Number(selectedWeightPart.standardWeight||0),lsl=std-tolerance,usl=std+tolerance;document.getElementById('weightLsl').textContent=lsl.toFixed(3);document.getElementById('weightStd').textContent=std.toFixed(3);document.getElementById('weightUsl').textContent=usl.toFixed(3);const box=document.getElementById('weightJudgment');if(actualText===''){box.className='mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-xl font-semibold text-slate-400';box.textContent='ระบุน้ำหนักที่ชั่ง';return;}const ok=Number(actualText)>=lsl&&Number(actualText)<=usl;box.className=`mt-6 rounded-2xl border p-6 text-center text-2xl font-semibold ${ok?'border-emerald-400/30 bg-emerald-400/10 text-emerald-300':'border-rose-400/30 bg-rose-400/10 text-rose-300'}`;box.textContent=ok?'✓ OK (PASS)':'! NG (FAIL)';}
+      document.getElementById('weightPartSearch').addEventListener('change',event=>{const q=event.target.value.trim().toLowerCase();selectedWeightPart=weightParts.find(item=>[item.idCode,item.partCode].some(value=>String(value).toLowerCase()===q))||null;if(!selectedWeightPart){showNotification('กรุณาเลือกชิ้นงานจากรายการ',false);return;}document.getElementById('weightPartTitle').textContent=`[${selectedWeightPart.idCode}] ${selectedWeightPart.partName}`;document.getElementById('weightMaterial').textContent=`Material: ${selectedWeightPart.material||'-'} · ${selectedWeightPart.partCode}`;updateWeightCalculation();});
+      ['weightTolerance','weightActual'].forEach(id=>document.getElementById(id).addEventListener('input',updateWeightCalculation));
+      function resetWeightForm(){const form=document.getElementById('weightForm');form.reset();selectedWeightPart=null;document.getElementById('weightDate').valueAsDate=new Date();document.getElementById('weightTolerance').value='5';document.getElementById('weightPartTitle').textContent='ยังไม่ได้เลือกชิ้นงาน';document.getElementById('weightMaterial').textContent='Material: -';['weightLsl','weightStd','weightUsl'].forEach(id=>document.getElementById(id).textContent='0.00');const box=document.getElementById('weightJudgment');box.className='mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-xl font-semibold text-slate-400';box.textContent='ระบุน้ำหนักที่ชั่ง';}
+      document.getElementById('weightForm').addEventListener('submit',async event=>{event.preventDefault();if(!selectedWeightPart){showNotification('กรุณาเลือกชิ้นงานจากรายการ',false);return;}const button=event.submitter;setButtonLoading(button,true,'กำลังบันทึก');const data={...selectedWeightPart,selectedDate:document.getElementById('weightDate').value,selectedTime:document.getElementById('weightTime').value,operatorId:document.getElementById('weightOperator').value.trim(),operatorName:currentAppUser?.displayName||currentAppUser?.name||currentAppUser?.username||currentAppUser?.sub,tolerance:Number(document.getElementById('weightTolerance').value),actualWeight:Number(document.getElementById('weightActual').value),remark:document.getElementById('weightRemark').value.trim()};try{const result=await apiPost('saveWeight',data);showNotification(`${result.message} · ${result.checkResult}`,true);resetWeightForm();await loadWeightHistory();}catch(error){showNotification(error.message,false);}finally{setButtonLoading(button,false);}});
+      async function loadWeightHistory(){try{const result=await apiPost('weightHistory');weightHistoryCache=result.rows||[];renderWeightHistory();}catch(error){showNotification(error.message,false);}}
+      function renderWeightHistory(){const q=document.getElementById('weightHistorySearch').value.toLowerCase(),items=weightHistoryCache.filter(item=>!q||(item.values||[]).some(value=>String(value).toLowerCase().includes(q))),canEdit=currentAppUser?.role==='admin'||currentAppUser?.canEdit===true,canDelete=currentAppUser?.role==='admin'||currentAppUser?.canDelete===true,canManage=canEdit||canDelete;const headers=['วันที่','เวลา','ID Code','Part Code','Part Name','น้ำหนักจริง','STD','Unit','ผู้ใช้','ผล'];document.getElementById('weightHistoryTable').innerHTML=items.length?`<table class="min-w-full whitespace-nowrap text-sm"><thead class="sticky top-0 z-10"><tr class="border-b bg-slate-100">${headers.map(header=>`<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">${header}</th>`).join('')}${canManage?'<th class="sticky right-0 bg-slate-100 px-4 py-3 text-right text-xs font-semibold text-slate-500">จัดการ</th>':''}</tr></thead><tbody>${items.map((item,index)=>{const row=item.values||[];return `<tr class="border-b last:border-0">${row.slice(0,9).map((value,column)=>`<td class="px-4 py-3 ${column===5?'font-semibold text-slate-800':'text-slate-600'}">${escapeHtml(value)}</td>`).join('')}<td class="px-4 py-3"><span class="result-badge ${String(row[9]).trim().toUpperCase().startsWith('OK')?'result-ok':'result-ng'}"><span>${String(row[9]).trim().toUpperCase().startsWith('OK')?'✓':'!'}</span>${escapeHtml(row[9])}</span></td>${canManage?`<td class="sticky right-0 bg-white px-3 py-2"><div class="flex justify-end gap-1">${canEdit?`<button data-edit-weight="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-emerald-700">แก้ไข</button>`:''}${canDelete?`<button data-delete-weight="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-rose-600">ลบ</button>`:''}</div></td>`:''}</tr>`;}).join('')}</tbody></table>`:'<div class="flex min-h-[240px] flex-col items-center justify-center text-slate-400"><div class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl">⌁</div><p>ไม่พบประวัติการบันทึก</p></div>';document.querySelectorAll('[data-edit-weight]').forEach(button=>button.addEventListener('click',()=>openWeightEditor(items[Number(button.dataset.editWeight)])));document.querySelectorAll('[data-delete-weight]').forEach(button=>button.addEventListener('click',async()=>{const item=items[Number(button.dataset.deleteWeight)];if(!await confirmAction('ลบประวัติน้ำหนัก',`${item.values[2]} · ${item.values[4]}`))return;try{const result=await apiPost('deleteWeight',{rowNumber:item.rowNumber});showNotification(result.message,true);await loadWeightHistory();}catch(error){showNotification(error.message,false);}}));}
+      function openWeightEditor(item){const form=document.getElementById('weightEditForm'),row=item.values||[];form.elements.rowNumber.value=item.rowNumber;form.elements.date.value=row[0]||'';form.elements.time.value=row[1]||'';form.elements.actualWeight.value=row[5]||'';form.elements.tolerance.value=row[10]||0;form.elements.remark.value=row[11]||'';document.getElementById('weightEditSubtitle').textContent=`${row[2]} · ${row[4]}`;openModal('weightEditModal');}
+      document.getElementById('closeWeightEdit').addEventListener('click',()=>closeModal('weightEditModal'));document.getElementById('cancelWeightEdit').addEventListener('click',()=>closeModal('weightEditModal'));
+      document.getElementById('weightEditForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setButtonLoading(button,true,'กำลังบันทึก');const data=Object.fromEntries(new FormData(event.target));data.rowNumber=Number(data.rowNumber);data.actualWeight=Number(data.actualWeight);data.tolerance=Number(data.tolerance);try{const result=await apiPost('updateWeight',data);showNotification(result.message,true);closeModal('weightEditModal');await loadWeightHistory();}catch(error){showNotification(error.message,false);}finally{setButtonLoading(button,false);}});
+      document.getElementById('weightHistorySearch').addEventListener('input',renderWeightHistory);document.getElementById('refreshWeightHistory').addEventListener('click',loadWeightHistory);
+      document.querySelectorAll('.weight-tab').forEach(button=>button.addEventListener('click',()=>{const record=button.dataset.weightTab==='record';document.getElementById('weightRecordPanel').classList.toggle('hidden',!record);document.getElementById('weightHistoryPanel').classList.toggle('hidden',record);document.querySelectorAll('.weight-tab').forEach(item=>{item.classList.remove('bg-emerald-600','text-white');item.classList.add('text-slate-500');});button.classList.add('bg-emerald-600','text-white');button.classList.remove('text-slate-500');if(!record)loadWeightHistory();}));
+
+      async function loadUsers() {
+        try { document.getElementById('usersTable').innerHTML=loadingMarkup;const result=await apiPost('users'); usersCache=result.rows||[]; applyUserFilters(); }
+        catch(error){ showNotification(error.message,false); }
+      }
+      function applyUserFilters(){const q=document.getElementById('userSearch').value.toLowerCase(),role=document.getElementById('userRoleFilter').value,status=document.getElementById('userStatusFilter').value;renderUsers(usersCache.filter(item=>(!q||Object.values(item).some(v=>String(v).toLowerCase().includes(q)))&&(!role||item.role===role)&&(!status||(status==='active')===item.active)));}
+      function renderUsers(rows){const admin=currentAppUser?.role==='admin';document.getElementById('usersTable').innerHTML=rows.length?`<table class="min-w-full whitespace-nowrap text-sm"><thead><tr class="border-b bg-slate-50">${['Username','ชื่อ','Role','สถานะ','Permissions','จัดการ'].map(h=>`<th class="px-3 py-3 text-left font-medium text-slate-500">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((item,index)=>`<tr class="border-b hover:bg-slate-50"><td class="px-3 py-3 font-medium">${escapeHtml(item.username)}</td><td class="px-3 py-3">${escapeHtml(item.displayName)}</td><td class="px-3 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs">${escapeHtml(item.role)}</span></td><td class="px-3 py-3"><span class="rounded-full px-2.5 py-1 text-xs ${item.active?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}">${item.active?'Active':'Disabled'}</span></td><td class="max-w-xs truncate px-3 py-3">${escapeHtml(item.permissions)}</td><td class="px-3 py-2"><div class="flex gap-1"><button data-edit-user="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-emerald-700">แก้ไข</button>${admin?`<button data-delete-user="${index}" class="rounded-lg border px-3 py-1.5 text-xs text-rose-600">ลบ</button>`:''}</div></td></tr>`).join('')}</tbody></table>`:'<p class="py-10 text-center text-slate-400">ไม่พบผู้ใช้งาน</p>';document.querySelectorAll('[data-edit-user]').forEach(button=>button.addEventListener('click',()=>openUserEditor(rows[Number(button.dataset.editUser)])));document.querySelectorAll('[data-delete-user]').forEach(button=>button.addEventListener('click',async()=>{const item=rows[Number(button.dataset.deleteUser)];if(!await confirmAction('ลบผู้ใช้งาน',`${item.username} · ${item.displayName}`))return;try{const result=await apiPost('deleteUser',{username:item.username});showNotification(result.message,true);loadUsers();}catch(error){showNotification(error.message,false);}}));}
+      function openUserEditor(item=null){const form=document.getElementById('userForm');form.reset();document.getElementById('userModalTitle').textContent=item?'แก้ไขผู้ใช้งาน':'เพิ่มผู้ใช้งาน';document.querySelectorAll('#permissionChecks input').forEach(input=>input.checked=input.value==='defects');if(item){form.elements.username.value=item.username;form.elements.displayName.value=item.displayName;form.elements.role.value=item.role;form.elements.active.value=String(item.active);form.elements.canEdit.checked=item.role==='admin'||item.canEdit===true;form.elements.canDelete.checked=item.role==='admin'||item.canDelete===true;const allowed=String(item.permissions||'').split(',');document.querySelectorAll('#permissionChecks input').forEach(input=>input.checked=item.role==='admin'||allowed.includes(input.value));}openModal('userModal');}
+      ['userSearch','userRoleFilter','userStatusFilter'].forEach(id=>document.getElementById(id).addEventListener(id==='userSearch'?'input':'change',applyUserFilters));document.getElementById('addUserButton').addEventListener('click',()=>openUserEditor());
+      document.getElementById('userForm').addEventListener('submit', async event => { event.preventDefault(); const button=event.submitter;setButtonLoading(button,true,'กำลังบันทึก');const data=Object.fromEntries(new FormData(event.target)); data.active=data.active==='true'; data.canEdit=event.target.elements.canEdit.checked; data.canDelete=event.target.elements.canDelete.checked; data.permissions=[...document.querySelectorAll('#permissionChecks input:checked')].map(input=>input.value).join(','); try { const result=await apiPost('saveUser',data); showNotification(result.message,true); closeModal('userModal'); await loadUsers(); } catch(error){ showNotification(error.message,false); } finally{setButtonLoading(button,false);} });
+
+      async function loadLogs() {
+        try { document.getElementById('logsTable').innerHTML=loadingMarkup;const result=await apiPost('logs'); logsCache=result.rows||[]; applyLogFilters(); }
+        catch(error){ showNotification(error.message,false); }
+      }
+      function applyLogFilters(){const q=document.getElementById('logSearch').value.toLowerCase(),action=document.getElementById('logActionFilter').value,status=document.getElementById('logStatusFilter').value;const rows=logsCache.filter(row=>(!q||row.some(v=>String(v).toLowerCase().includes(q)))&&(!action||row[2]===action)&&(!status||row[4]===status));logExportRows=rows;document.getElementById('logsTable').innerHTML=renderMatrix(rows,['เวลา','ผู้ใช้','Action','รายละเอียด','สถานะ']);}
+      ['logSearch','logActionFilter','logStatusFilter'].forEach(id=>document.getElementById(id).addEventListener(id==='logSearch'?'input':'change',applyLogFilters));
+
+      // ฟังก์ชันสำหรับค้นหาข้อมูลชิ้นงาน
+      searchButton.addEventListener('click', async () => {
+        const partCode = partCodeInput.value.trim();
+        if (partCode) {
+          searchButton.disabled = true; // Disable search button
+          searchButton.textContent = 'กำลังค้นหา...'; // Change search button text
+          loadingMessage.textContent = 'กำลังค้นหา...'; // Update loading popup message
+          loadingPopup.classList.remove('hidden'); // Show loading popup
+
+          try {
+              const result = await callApi({
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'search', partCode })
+              });
+              loadingPopup.classList.add('hidden'); // Hide loading popup
+              searchButton.disabled = false; // Re-enable search button
+              searchButton.textContent = 'ค้นหา'; // Reset search button text
+              if (result && !result.error) {
+                document.getElementById('partNo').value = result.partNo || '';
+                document.getElementById('partName').value = result.partName || '';
+                document.getElementById('material').value = result.material || '';
+                document.getElementById('partWeight').value = result.partWeight || '';
+                document.getElementById('runnerWeight').value = result.runnerWeight || '';
+              } else {
+                document.getElementById('partNo').value = '';
+                document.getElementById('partName').value = '';
+                document.getElementById('material').value = '';
+                document.getElementById('partWeight').value = '';
+                document.getElementById('runnerWeight').value = '';
+                showNotification(result.error || 'ไม่พบรหัสชิ้นงานนี้', false);
+              }
+          } catch (error) {
+              loadingPopup.classList.add('hidden'); // Hide loading popup
+              searchButton.disabled = false; // Re-enable search button
+              searchButton.textContent = 'ค้นหา'; // Reset search button text
+              showNotification('เกิดข้อผิดพลาดในการค้นหา: ' + error.message, false);
+          }
+        } else {
+          showNotification('กรุณาใส่รหัสชิ้นงานที่ต้องการค้นหา', false);
+        }
+      });
+
+      // ฟังก์ชันสำหรับบันทึกข้อมูล
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => {
+          data[key] = value;
+        });
+
+        // ตรวจสอบว่ามีข้อมูลชิ้นงานที่ค้นหามาแล้วหรือไม่
+        if (!data.partName || !data.partNo) {
+          showNotification('กรุณาค้นหารหัสชิ้นงานก่อนบันทึก', false);
+          return;
+        }
+        if (!(machineCache.numbers||[]).some(value=>String(value)===String(data.mcNo))) {
+          showNotification('กรุณาเลือกหมายเลขเครื่องฉีดจากรายการ', false);
+          return;
+        }
+        if (!(machineCache.sizes||[]).some(value=>String(value)===String(data.mcSize))) {
+          showNotification('กรุณาเลือกขนาดเครื่องฉีดจากรายการ', false);
+          return;
+        }
+        
+        // ตรวจสอบว่าได้เลือกกะการผลิตหรือไม่
+        if (!data.shift) {
+          showNotification('กรุณาเลือกกะการผลิต', false);
+          return;
+        }
+
+        saveButton.disabled = true;
+        saveButton.textContent = 'กำลังบันทึก...';
+        loadingMessage.textContent = 'กำลังบันทึก...'; // Update loading popup message for saving
+        loadingPopup.classList.remove('hidden'); // Show loading popup for saving
+        
+        try {
+            const result = await callApi({
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'save', data })
+            });
+            loadingPopup.classList.add('hidden'); // Hide loading popup
+            if (result.success) {
+              showNotification(result.message, true);
+              form.reset(); // ล้างฟอร์ม
+              document.getElementById('date').valueAsDate = new Date(); // ตั้งค่าวันที่ปัจจุบันอีกครั้ง
+              document.getElementById('shift').value = 'A'; // ตั้งค่ากะ A เป็นค่าเริ่มต้น
+            } else {
+              showNotification(result.message, false);
+            }
+            saveButton.disabled = false;
+            saveButton.textContent = 'บันทึก';
+        } catch (error) {
+            loadingPopup.classList.add('hidden'); // Hide loading popup
+            showNotification('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + error.message, false);
+            saveButton.disabled = false;
+            saveButton.textContent = 'บันทึก';
+        }
+      });
+
+      // ฟังก์ชันสำหรับล้างฟอร์ม
+      clearButton.addEventListener('click', () => {
+        form.reset();
+        document.getElementById('date').valueAsDate = new Date(); // ตั้งค่าวันที่ปัจจุบันอีกครั้ง
+        document.getElementById('shift').value = 'A'; // ตั้งค่ากะ A เป็นค่าเริ่มต้น
+        showNotification('ฟอร์มถูกล้างเรียบร้อยแล้ว', true);
+      });
+    }); // ปิด DOMContentLoaded event listener
+  </script>
+</body>
+</html>

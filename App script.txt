@@ -1,0 +1,245 @@
+const SPREADSHEET_ID = '1y2pYHrKR9CIo_UEIp2tnuSnqLHuiYOXVXzXM6NAAsTs'; // เปลี่ยนเป็น ID ของ Google Sheet ของคุณ
+const DATABASE_SHEET_NAME = 'dataBase';
+const RAWDATA_SHEET_NAME = 'rawData';
+
+/**
+ * ฟังก์ชันสำหรับแสดงผล HTML UI
+ * @returns {HtmlOutput} HTML UI ของฟอร์ม
+ */
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index').evaluate()
+      .setTitle('บันทึกของเสีย Purity Plastic')
+      .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+}
+
+/**
+ * ฟังก์ชันสำหรับค้นหาข้อมูลชิ้นงานจากรหัสชิ้นงาน
+ * @param {string} idCode รหัสชิ้นงานที่ต้องการค้นหา
+ * @returns {Object} ข้อมูลชิ้นงานที่พบ หรือข้อความแสดงข้อผิดพลาด
+ */
+function searchPartCode(idCode) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(DATABASE_SHEET_NAME);
+    if (!sheet) {
+      return { error: 'ไม่พบชีท "dataBase"' };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    // ค้นหาข้อมูลโดยเริ่มจากแถวที่ 2 (ข้าม header)
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][1] && data[i][1].toString().trim() === idCode.trim()) { // Column B: ID Code (index 1)
+        return {
+          partNo: data[i][2] ? data[i][2].toString() : '',    // Column C: Part Code (index 2)
+          partName: data[i][3] ? data[i][3].toString() : '',  // Column D: Part Name (index 3)
+          material: data[i][4] ? data[i][4].toString() : '',  // Column E: Material (index 4)
+          partWeight: data[i][5] ? data[i][5].toString() : '',// Column F: Part weight (g) (index 5)
+          runnerWeight: data[i][6] ? data[i][6].toString() : '' // Column G: Runner weight (g) (index 6)
+        };
+      }
+    }
+    return { error: 'ไม่พบรหัสชิ้นงานนี้ในฐานข้อมูล' };
+  } catch (e) {
+    Logger.log('Error in searchPartCode: ' + e.message); // เพิ่มบรรทัดนี้เพื่อบันทึกข้อผิดพลาด
+    return { error: 'เกิดข้อผิดพลาดในการค้นหาข้อมูล: ' + e.message };
+  }
+}
+
+/**
+ * ฟังก์ชันสำหรับบันทึกข้อมูลของเสียลงใน Google Sheet
+ * @param {Object} data ข้อมูลที่ส่งมาจากฟอร์ม HTML
+ * @returns {Object} สถานะความสำเร็จและข้อความ
+ */
+function saveDefectData(data) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(RAWDATA_SHEET_NAME);
+    if (!sheet) {
+      return { success: false, message: 'ไม่พบชีท "rawData"' };
+    }
+
+    // แปลงค่า input ที่เป็นตัวเลขให้เป็น Number และจัดการค่าว่างให้เป็น 0
+    const productionQuantity = parseFloat(data.productionQuantity) || 0;
+    const mcNo = parseFloat(data.mcNo) || 0;
+    const mcSize = parseFloat(data.mcSize) || 0;
+    const shift = data.shift || ''; // เพิ่มค่า 'shift' ที่ส่งมาจากฟอร์ม
+
+    // ประเภทของเสีย (ชิ้น)
+    const blackDot = parseFloat(data.blackDot) || 0;
+    const underfill = parseFloat(data.underfill) || 0;
+    const broken = parseFloat(data.broken) || 0;
+    const bubble = parseFloat(data.bubble) || 0;
+    const colorMix = parseFloat(data.colorMix) || 0;
+    const crack = parseFloat(data.crack) || 0;
+    const oilStain = parseFloat(data.oilStain) || 0;
+    const scratch = parseFloat(data.scratch) || 0;
+    const trimWaste = parseFloat(data.trimWaste) || 0;
+    const sinkMark = parseFloat(data.sinkMark) || 0;
+    const dropped = parseFloat(data.dropped) || 0;
+    const ejectorPinMark = parseFloat(data.ejectorPinMark) || 0;
+    const flash = parseFloat(data.flash) || 0;
+    const warp = parseFloat(data.warp) || 0;
+    const weldLine = parseFloat(data.weldLine) || 0;
+    const other = parseFloat(data.other) || 0;
+
+    // ประเภทของเสียจากการปรับฉีด (ชิ้น)
+    const adjBlackDot = parseFloat(data.adjBlackDot) || 0;
+    const adjUnderfill = parseFloat(data.adjUnderfill) || 0;
+    const adjBroken = parseFloat(data.adjBroken) || 0;
+    const adjBubble = parseFloat(data.adjBubble) || 0;
+    const adjColorMix = parseFloat(data.adjColorMix) || 0;
+    const adjCrack = parseFloat(data.adjCrack) || 0;
+    const adjSinkMark = parseFloat(data.adjSinkMark) || 0;
+    const adjEjectorPinMark = parseFloat(data.adjEjectorPinMark) || 0;
+    const adjFlash = parseFloat(data.adjFlash) || 0;
+    const adjWarp = parseFloat(data.adjWarp) || 0;
+    const adjWeldLine = parseFloat(data.adjWeldLine) || 0;
+    const adjStain = parseFloat(data.adjStain) || 0;
+    const adjOther = parseFloat(data.adjOther) || 0;
+
+    // คำนวณจำนวนของเสียจากการผลิต (Column L)
+    const totalDefectProd = blackDot + underfill + broken + bubble + colorMix + crack + oilStain + scratch + trimWaste + sinkMark + dropped + ejectorPinMark + flash + warp + weldLine + other    
+
+    // คำนวณจำนวนของเสียจากการปรับฉีด (Column M)
+    const totalDefectAdj = adjBlackDot + adjUnderfill + adjBroken + adjBubble + adjColorMix + adjCrack + adjSinkMark + adjEjectorPinMark + adjFlash + adjWarp + adjWeldLine + adjStain + adjOther;                          
+
+    // คำนวณจำนวนของเสียทั้งหมด (Column N)
+    const totalDefectQuantity = blackDot + underfill + broken + bubble + colorMix + crack + oilStain + scratch + trimWaste + sinkMark + dropped + ejectorPinMark + flash + warp + weldLine + other +
+                                adjBlackDot + adjUnderfill + adjBroken + adjBubble + adjColorMix + adjCrack + adjSinkMark + adjEjectorPinMark + adjFlash + adjWarp + adjWeldLine + adjStain + adjOther;
+
+    // คำนวณจำนวนทั้งหมด (Column O)
+    const totalQuantity = totalDefectQuantity + productionQuantity;
+
+    // คำนวณ % ของเสีย (Column P)
+    const defectPercentage = (totalQuantity > 0) ? (totalDefectQuantity / totalQuantity) : 0;
+
+    // คำนวณน้ำหนักของเสีย (Column Q)
+    const totalWeight = data.partWeight * totalDefectQuantity;
+
+    // --- [เพิ่มส่วนนี้] ค้นหาราคาจาก dataBase มาคูณกับ totalDefectQuantity (Column N) ---
+    let totalCost = 0;
+    try {
+      const dbSheet = spreadsheet.getSheetByName(DATABASE_SHEET_NAME);
+      if (dbSheet && data.partCode) {
+        const dbData = dbSheet.getRange("B2:H" + dbSheet.getLastRow()).getValues();
+        const targetCode = String(data.partCode).trim();
+        
+        // ค้นหา ID Code ในคอลัมน์ B (index 0) เพื่อเอาราคาในคอลัมน์ H (index 6)
+        const matchRow = dbData.find(row => String(row[0]).trim() === targetCode);
+        if (matchRow) {
+          const price = parseFloat(matchRow[6]) || 0;
+          totalCost = price * totalDefectQuantity; // ราคา * จำนวนของเสีย (Column N)
+        }
+      }
+    } catch (err) {
+      Logger.log('Error calculating totalCost: ' + err.message);
+    }
+
+    // จัดรูปแบบวันที่ให้ถูกต้อง
+    const date = new Date(data.date);
+    const formattedDate = Utilities.formatDate(date, spreadsheet.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+
+    // เตรียมข้อมูลสำหรับบันทึกลงชีท
+    const rowData = [
+      formattedDate,        // Column A: Date
+      data.partCode,        // Column B: ID Code
+      data.partNo,          // Column C: Part Code
+      data.partName,        // Column D: Part Name
+      data.material,        // Column E: R/M
+      data.partWeight,      // Column F: Part weight
+      data.runnerWeight,    // Column G: R/N weight
+      (mcNo > 0) ? `M/C ${mcNo}` : '', // Column H: M/C No.  แก้ไขบรรทัดนี้: เพิ่ม "M/C " ขึ้นต้นถ้ามีค่า
+      (mcSize > 0) ? `${mcSize} Ton` : '', // Column I: M/C (Ton) แก้ไขบรรทัดนี้: เพิ่ม " Ton" ต่อท้ายถ้ามีค่า
+      (shift !== '') ? `Shift ${shift}` : '', // Column J: กะการผลิต 
+      productionQuantity,   // Column K: จำนวนของดี 
+      totalDefectProd,      // Column L: จำนวนของดี 
+      totalDefectAdj,       // Column M: จำนวนของดี 
+      totalDefectQuantity,  // Column N: จำนวนของเสีย 
+      totalQuantity,        // Column O: จำนวนทั้งหมด 
+      defectPercentage,     // Column P: % ของเสีย
+      totalWeight,          // Column Q: น้ำหนักของเสีย 
+      blackDot,             // Column R: จุดดำ 
+      underfill,            // Column S: แหว่ง 
+      broken,               // Column T: แตก 
+      bubble,               // Column U: ฟองอากาศ 
+      colorMix,             // Column V: สีปน 
+      crack,                // Column W: ร้าว 
+      oilStain,             // Column X: คราบน้ำมัน 
+      scratch,              // Column Y: รอยขีดข่วน 
+      trimWaste,            // Column Z: แต่งเสีย 
+      sinkMark,             // Column AA: ยุบ 
+      dropped,              // Column AB: หล่น 
+      ejectorPinMark,       // Column AC: กระทุ้งขาว 
+      flash,                // Column AD: ครีบแลบ 
+      warp,                 // Column AE: โก่ง-แอ่น 
+      weldLine,             // Column AF: รอยประสาน 
+      other,                // Column AG: อื่นๆ 
+      adjBlackDot,          // Column AH: จุดดำ(ไหม้).Adj
+      adjUnderfill,         // Column AI: แหว่ง.Adj
+      adjBroken,            // Column AJ: แตก.Adj
+      adjBubble,            // Column AK: ฟองอากาศ.Adj
+      adjColorMix,          // Column AL: สีปน.Adj
+      adjCrack,             // Column AM: ร้าว.Adj
+      adjSinkMark,          // Column AN: ยุบ.Adj
+      adjEjectorPinMark,    // Column AO: กระทุ้งขาว.Adj
+      adjFlash,             // Column AP: ครีบแลบ.Adj
+      adjWarp,              // Column AQ: โก่ง-แอ่น.Adj
+      adjWeldLine,          // Column AR: รอยประสาน.Adj
+      adjStain,             // Column AS: คราบ.Adj
+      adjOther,             // Column AT: อื่นๆ.Adj
+      totalCost             // Column AU: ผลคูณราคา x จำนวนของเสีย (INDEX-MATCH * N)
+    ];
+
+    sheet.appendRow(rowData); // บันทึกข้อมูลลงในชีท
+
+    return { success: true, message: 'บันทึกข้อมูลสำเร็จแล้ว!' };
+  } catch (e) {
+    Logger.log('Error in saveDefectData: ' + e.message); // เพิ่มบรรทัดนี้เพื่อบันทึกข้อผิดพลาด
+    return { success: false, message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + e.message };
+  }
+}
+
+/**
+ * ฟังก์ชันคำนวณราคาคูณจำนวนอัตโนมัติ (INDEX-MATCH * Quantity)
+ */
+function calculateOnNewData() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID); // ใช้ตัวแปร SPREADSHEET_ID เดิมที่คุณตั้งไว้ได้เลย
+  const sheet = ss.getSheetByName(RAWDATA_SHEET_NAME); // อ้างอิงถึงชีต rawData
+  const dbSheet = ss.getSheetByName(DATABASE_SHEET_NAME); // อ้างอิงถึงชีต dataBase
+  
+  if (!sheet || !dbSheet) return;
+  
+  // 1. ดึงข้อมูลจาก dataBase มาเก็บไว้ทำ Lookup
+  const dbData = dbSheet.getRange("B2:H" + dbSheet.getLastRow()).getValues();
+  const priceMap = new Map();
+  dbData.forEach(row => {
+    const key = row[0];   // คอลัมน์ B ใน dataBase
+    const val = row[6];   // คอลัมน์ H ใน dataBase
+    if (key) priceMap.set(String(key).trim(), Number(val) || 0);
+  });
+  
+  // 2. ดึงข้อมูลจากชีต rawData มาคำนวณ
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  
+  const bValues = sheet.getRange(2, 2, lastRow - 1, 1).getValues();  // คอลัมน์ B
+  const nValues = sheet.getRange(2, 14, lastRow - 1, 1).getValues(); // คอลัมน์ N (ลำดับที่ 14)
+  
+  const results = [];
+  
+  for (let i = 0; i < bValues.length; i++) {
+    const bKey = String(bValues[i][0]).trim();
+    const nVal = Number(nValues[i][0]) || 0;
+    
+    if (bKey && priceMap.has(bKey)) {
+      const matchedValue = priceMap.get(bKey);
+      results.push([matchedValue * nVal]);
+    } else {
+      results.push([""]); // ถ้าหาไม่เจอให้ใส่ค่าว่างไว้
+    }
+  }
+  
+  // 3. เขียนผลลัพธ์ลงในคอลัมน์ที่ต้องการ (สมมติว่าเป็นคอลัมน์ AU หรือคอลัมน์ที่ 47)
+  const targetColumn = 47; // *** แก้ไขตัวเลขคอลัมน์เป้าหมายตรงนี้ให้ตรงกับ Sheet ของคุณ ***
+  sheet.getRange(2, targetColumn, results.length, 1).setValues(results);
+}
