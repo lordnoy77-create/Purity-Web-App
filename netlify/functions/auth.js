@@ -1,4 +1,4 @@
-const { clearSessionCookie, createToken, getSession, sessionCookie } = require('./_shared/auth');
+const { clearSessionCookie, createToken, getSession, parsePermissions, sessionCookie } = require('./_shared/auth');
 
 const APP_SCRIPT_URL = process.env.APP_SCRIPT_URL ||
   'https://script.google.com/macros/s/AKfycbxoxuV0Q8DcMASguKTsd6R7r6IgR8Gt-DpgNbUfHIm1r1VeLk236WbudUK0pLIEK-MaIg/exec';
@@ -35,7 +35,13 @@ exports.handler = async event => {
 
     const result = await appsScriptLogin(String(body.username || ''), String(body.password || ''));
     if (!result.success || !result.user) return json(401, { error: result.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
-    const user = { ...result.user, mustChangePassword: false };
+    const user = {
+      ...result.user,
+      permissions: parsePermissions(result.user.permissions),
+      canEdit: result.user.role === 'admin' || result.user.canEdit === true || result.user.canEdit === 'true' || result.user.canEdit === 'TRUE',
+      canDelete: result.user.role === 'admin' || result.user.canDelete === true || result.user.canDelete === 'true' || result.user.canDelete === 'TRUE',
+      mustChangePassword: false
+    };
     return json(200, { success: true, user }, sessionCookie(createToken(user)));
   } catch (error) {
     console.error(error);

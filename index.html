@@ -576,6 +576,10 @@
       }
 
       function showApp(user) {
+        const userPermissions = Array.isArray(user.permissions)
+          ? user.permissions
+          : (typeof user.permissions === 'string' ? user.permissions.split(',').map(s => s.trim()).filter(Boolean) : ['defects']);
+        user.permissions = userPermissions;
         currentAppUser = user;
         sessionStorage.setItem(TAB_SESSION_KEY, 'active');
         startSessionTimeout();
@@ -583,7 +587,7 @@
         currentRole.textContent = String(user.role || 'user').toUpperCase();
         document.getElementById('addPartButton').classList.toggle('hidden', !(user.role === 'admin' || user.canEdit === true));
         document.querySelectorAll('.add-machine-button').forEach(button=>button.classList.toggle('hidden', !(user.role === 'admin' || user.canEdit === true)));
-        const permissions = user.role === 'admin' ? ['home','dashboard','defects','weights','parts','users','logs'] : [...new Set(['home', ...(user.permissions || ['defects'])])];
+        const permissions = user.role === 'admin' ? ['home','dashboard','defects','weights','parts','users','logs'] : [...new Set(['home', ...userPermissions])];
         document.querySelectorAll('[data-permission]').forEach(button => button.classList.toggle('hidden', !permissions.includes(button.dataset.permission)));
         navigateTo(permissions.includes('home') ? 'home' : permissions[0]);
         // เปิด App หลังหน้า Login ถูกซ่อนแล้ว ป้องกันภาพ Dashboard แวบด้านหลัง
@@ -770,7 +774,10 @@
       function renderDashboardVisuals(){if(typeof Chart==='undefined'){showNotification('ไม่สามารถโหลดระบบกราฟได้',false);return;}renderComboChart();renderWeightChart();renderMaterialChart();renderTopParts();}
 
       async function loadDashboard() {
-        const canDashboard = currentAppUser?.role === 'admin' || (currentAppUser?.permissions || []).includes('dashboard');
+        const userPermissions = Array.isArray(currentAppUser?.permissions)
+          ? currentAppUser.permissions
+          : (typeof currentAppUser?.permissions === 'string' ? currentAppUser.permissions.split(',').map(s => s.trim()).filter(Boolean) : []);
+        const canDashboard = currentAppUser?.role === 'admin' || userPermissions.includes('dashboard');
         if (!canDashboard) return;
         try {
           document.getElementById('rawDataTable').innerHTML=loadingMarkup;

@@ -13,16 +13,25 @@ function sign(data) {
   return crypto.createHmac('sha256', secret).update(data).digest('base64url');
 }
 
+function parsePermissions(perms) {
+  if (Array.isArray(perms)) return perms;
+  if (typeof perms === 'string') {
+    return perms.split(',').map(p => p.trim()).filter(Boolean);
+  }
+  return [];
+}
+
 function createToken(user) {
   const now = Math.floor(Date.now() / 1000);
   const header = encode({ alg: 'HS256', typ: 'JWT' });
+  const permissions = parsePermissions(user.permissions);
   const payload = encode({
     sub: user.username,
     name: user.displayName,
     role: user.role,
-    permissions: Array.isArray(user.permissions) ? user.permissions : [],
-    canEdit: user.role === 'admin' || user.canEdit === true,
-    canDelete: user.role === 'admin' || user.canDelete === true,
+    permissions: permissions,
+    canEdit: user.role === 'admin' || user.canEdit === true || user.canEdit === 'true' || user.canEdit === 'TRUE',
+    canDelete: user.role === 'admin' || user.canDelete === true || user.canDelete === 'true' || user.canDelete === 'TRUE',
     mustChangePassword: user.mustChangePassword,
     iat: now,
     exp: now + SESSION_SECONDS
@@ -85,6 +94,7 @@ module.exports = {
   createToken,
   getSession,
   hashPassword,
+  parsePermissions,
   sessionCookie,
   verifyPassword
 };
