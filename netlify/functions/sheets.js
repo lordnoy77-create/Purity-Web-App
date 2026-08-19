@@ -33,7 +33,10 @@ exports.handler = async event => {
     if (['saveUser','deleteUser'].includes(body.action) && session.role !== 'admin') return json(403, { error: 'เฉพาะ Admin เท่านั้นที่จัดการผู้ใช้งานได้' });
     if (['updateRawData','savePart','saveMachine','updateWeight'].includes(body.action) && session.role !== 'admin' && session.canEdit !== true) return json(403, { error: 'คุณไม่มีสิทธิ์เพิ่มหรือแก้ไขข้อมูล' });
     if (['deleteRawData','deletePart','deleteMachine','deleteWeight'].includes(body.action) && session.role !== 'admin' && session.canDelete !== true) return json(403, { error: 'คุณไม่มีสิทธิ์ลบข้อมูล' });
-    const allowed = session.role === 'admin' || (Array.isArray(session.permissions) && session.permissions.includes(permission));
+    const userPermissions = Array.isArray(session.permissions) ? session.permissions : [];
+    const allowed = session.role === 'admin' ||
+      userPermissions.includes(permission) ||
+      (['parts', 'machines'].includes(body.action) && userPermissions.length > 0);
     if (!allowed) return json(403, { error: 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้' });
 
     const response = await fetch(APP_SCRIPT_URL, {
